@@ -14,6 +14,7 @@ import { bioYears, inCryo, tauAtBio } from "@/lib/cryo";
 import { dopplerOf, fuel, headlineFor, inbox, shield } from "@/lib/voyage";
 import { EarthScene } from "./EarthScene";
 import { ShipScene } from "./ShipScene";
+import { shipSky } from "./shipSky";
 import { useSoundscape } from "./useSoundscape";
 
 const SEC_PER_YEAR = 365.25 * 86_400;
@@ -186,7 +187,7 @@ function BirthdayNote({ age }: { age: number }) {
 
 const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee", decel: "#a78bfa", stay: "#f472b6", surface: "#f97316" };
 
-export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data" | "clocks" | "telescope") => void }) {
+export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data" | "clocks" | "telescope" | "window") => void }) {
   const { stage, ship, trip, lifespan, destination, cinematicTime } = sim;
   const [copied, setCopied] = useState(false);
   const [sound, setSound] = useState(false);
@@ -216,18 +217,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
 
   const D = trip.params.distance;
   const outbound = ship.phase.leg === "ida";
-  const aheadDistance = stage === "done" ? 1e-6 : outbound && ship.phase.kind !== "stay" ? D - ship.x : outbound ? 1 : ship.x;
-  const farFromGalaxy = D > 30_000 && Math.min(ship.x, D - ship.x) > 30_000;
-  const phi = flying && stage !== "done" ? Math.acosh(Math.max(1, ship.gamma)) : 0;
-  const sky = {
-    phi,
-    aheadDistance: Math.max(1e-6, aheadDistance),
-    altitudeKm: flying ? ship.x * LY_KM : 0,
-    aheadKind: (outbound ? (destination.kind === "custom" ? "star" : destination.kind) : "sun") as "star" | "cluster" | "galaxy" | "sun" | "planet",
-    planet: outbound ? destination.planet : undefined,
-    blackHole: (ship.phase.kind === "stay" && stage === "flight") || (outbound && destination.kind === "blackhole" && stage === "flight"),
-    starDensity: farFromGalaxy ? 0.06 : 1,
-  };
+  const sky = shipSky(sim);
+  const phi = sky.phi;
 
   const earthSeenAge = START_AGE + d.earthSeenFromShip;
   // Tomás se entera de la muerte de su hermano cuando le llega esa luz; queda triste unos dos meses.
@@ -613,6 +604,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           outside={{ years: earthYears, deathYears }}
           focusX={shipFocus}
           onOpenMap={() => onOpen("map")}
+          onOpenWindow={() => onOpen("window")}
           onOpenClocks={() => onOpen("clocks")}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
@@ -681,7 +673,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             </div>
             {phi > 0.05 && (
               <div>
-                Ventana (centro = adelante, borde = atrás): dentro del círculo punteado la luz llega{" "}
+                Ventana (clic en ella para mirar; centro = adelante, borde = atrás): dentro del círculo punteado la luz llega{" "}
                 <b className="text-sky-300">más azul (hasta ×{formatFactor(Math.exp(phi)).slice(1)})</b>; fuera,{" "}
                 <b className="text-rose-300">más roja y tenue</b>. Es el efecto Doppler.
               </div>

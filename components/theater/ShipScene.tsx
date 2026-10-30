@@ -45,6 +45,8 @@ export interface ShipSceneProps {
   onOpenMap?: () => void;
   /** Clic en el reloj de la misión: abre la comparación de relojes. */
   onOpenClocks?: () => void;
+  /** Clic en la ventana: abre la vista grande del cielo. */
+  onOpenWindow?: () => void;
 }
 
 /** Brazo de acceso de la tripulación, en lo alto de la torre, hasta la escotilla de la Ranger. */
@@ -500,13 +502,16 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       <circle cx="197" cy="75" r="8" fill="#f2c9a0" stroke={INK} strokeWidth="0.6" />
       <path d="M189 73 q8 -11 16 0" fill="#3a2618" stroke={INK} strokeWidth="0.7" />
       <rect x="187" y="85" width="20" height="18" rx="3" fill="#2563eb" stroke={INK} strokeWidth="0.7" />
-      {/* Ventana relativista */}
-      <foreignObject x="612" y="36" width="176" height="156">
-        <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden" }}>
-          <RelativisticSky {...props.sky} />
-        </div>
-      </foreignObject>
-      <ellipse cx="700" cy="114" rx="90" ry="80" fill="none" stroke="#cbd5e1" strokeWidth="10" />
+      {/* Ventana relativista: un clic la abre en grande */}
+      <g onClick={props.onOpenWindow} role="button" aria-label="Mirar por la ventana" className="cursor-pointer">
+        <title>Mirar por la ventana</title>
+        <foreignObject x="612" y="36" width="176" height="156">
+          <div style={{ width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden" }}>
+            <RelativisticSky {...props.sky} />
+          </div>
+        </foreignObject>
+        <ellipse cx="700" cy="114" rx="90" ry="80" fill="none" stroke="#cbd5e1" strokeWidth="10" className="transition hover:stroke-cyan-200" />
+      </g>
       <ellipse cx="700" cy="114" rx="96" ry="86" fill="none" stroke={INK} strokeWidth="1.5" />
       {Array.from({ length: 8 }, (_, i) => (
         <circle key={i} cx={700 + Math.cos((i * Math.PI) / 4) * 93} cy={114 + Math.sin((i * Math.PI) / 4) * 83} r="2.4" fill="#64748b" />

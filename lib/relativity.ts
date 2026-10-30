@@ -32,6 +32,8 @@ export interface Destination {
   planet?: PlanetInfo;
   /** Agujero negro con un planeta en órbita muy cercana: cada hora allí son años en la Tierra. */
   miller?: { hours: number; factor: number };
+  /** Temperatura de color real (K): decide el color con que se ve antes del corrimiento Doppler. */
+  tempK?: number;
 }
 
 export const DESTINATIONS: Destination[] = [
@@ -51,20 +53,24 @@ export const DESTINATIONS: Destination[] = [
     id: "triton", name: "Tritón (luna de Neptuno)", distance: 30 * AU_LY, kind: "planet",
     planet: { parent: "neptune", surfaceDays: 15, ground: "#f5d0fe", groundDark: "#c4b5fd", sky: "#020617", rock: "#a78bfa", gravity: 0.08, diameterKm: 49_244 },
   },
-  { id: "proxima", name: "Próxima Centauri", distance: 4.24, kind: "star" },
+  { id: "proxima", name: "Próxima Centauri", distance: 4.24, kind: "star", tempK: 3_042 },
   {
     id: "gargantua", name: "Gargantúa · planeta de Miller (ficticio)", distance: 15, kind: "blackhole",
     // Como en Interstellar: 1 hora en el planeta = 7 años en la Tierra (factor 61.320).
     miller: { hours: 3, factor: 61_320 },
+    tempK: 4_500,
   },
-  { id: "sirio", name: "Sirio", distance: 8.6, kind: "star" },
-  { id: "vega", name: "Vega", distance: 25, kind: "star" },
-  { id: "aldebaran", name: "Aldebarán", distance: 65, kind: "star" },
-  { id: "pleyades", name: "Las Pléyades", distance: 444, kind: "cluster" },
-  { id: "betelgeuse", name: "Betelgeuse", distance: 548, kind: "star" },
-  { id: "centro", name: "Centro de la Vía Láctea", distance: 26_000, kind: "cluster" },
-  { id: "andromeda", name: "Andrómeda", distance: ANDROMEDA_LY, kind: "galaxy" },
-  { id: "cuasar", name: "Cuásar 3C 273", distance: 2.44e9, kind: "galaxy" },
+  { id: "sirio", name: "Sirio", distance: 8.6, kind: "star", tempK: 9_940 },
+  { id: "vega", name: "Vega", distance: 25, kind: "star", tempK: 9_602 },
+  { id: "aldebaran", name: "Aldebarán", distance: 65, kind: "star", tempK: 3_910 },
+  // Cúmulo dominado por estrellas jóvenes azules (tipo B).
+  { id: "pleyades", name: "Las Pléyades", distance: 444, kind: "cluster", tempK: 13_000 },
+  { id: "betelgeuse", name: "Betelgeuse", distance: 548, kind: "star", tempK: 3_600 },
+  // Color integrado de un bulbo de estrellas viejas, amarillento.
+  { id: "centro", name: "Centro de la Vía Láctea", distance: 26_000, kind: "cluster", tempK: 4_800 },
+  { id: "andromeda", name: "Andrómeda", distance: ANDROMEDA_LY, kind: "galaxy", tempK: 5_200 },
+  // El brillo de un cuásar no es térmico; su luz es muy azulada, como un cuerpo de ~20.000 K.
+  { id: "cuasar", name: "Cuásar 3C 273", distance: 2.44e9, kind: "galaxy", tempK: 20_000 },
 ];
 
 export const gamma = (beta: number) => 1 / Math.sqrt(1 - beta * beta);

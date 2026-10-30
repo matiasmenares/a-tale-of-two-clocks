@@ -16,6 +16,10 @@ export interface SkyProps {
   blackHole: boolean;
   /** Densidad de estrellas de fondo (0–1): fuera de la galaxia casi no hay. */
   starDensity: number;
+  /** Temperatura real de lo que hay adelante (K). */
+  aheadTemp?: number;
+  /** Dibujar guías y rótulos explicativos (vista grande). */
+  guides?: boolean;
 }
 
 /** Longitud de onda visible (550 nm) en kelvin: hc/(λk). */
@@ -24,7 +28,7 @@ const X_VIS = 26_160;
 const FOV = Math.PI;
 
 /** Color aproximado de un cuerpo negro (algoritmo de Tanner Helland). */
-function blackbody(T: number): [number, number, number] {
+export function blackbody(T: number): [number, number, number] {
   const t = Math.min(40_000, Math.max(1_000, T)) / 100;
   const r = t <= 66 ? 255 : 329.7 * (t - 60) ** -0.1332;
   const g = t <= 66 ? 99.47 * Math.log(t) - 161.1 : 288.1 * (t - 60) ** -0.0755;
@@ -66,7 +70,7 @@ export function RelativisticSky(props: SkyProps) {
     const stars = makeStars(1400);
     let raf = 0;
     const draw = () => {
-      const { phi, aheadDistance, altitudeKm, aheadKind, blackHole, starDensity, planet } = live.current;
+      const { phi, aheadDistance, altitudeKm, aheadKind, blackHole, starDensity, planet, aheadTemp, guides } = live.current;
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       const dpr = devicePixelRatio || 1;
@@ -119,7 +123,9 @@ export function RelativisticSky(props: SkyProps) {
         if (!p) continue;
         const D = doppler(s.theta);
         const x = X_VIS / s.T;
-        const bright = (s.mag * Math.expm1(x)) / Math.expm1(x / D);
+        // Radiancia visible: un cuerpo negro a T se ve como uno a D·T. Flujo de una estrella puntual:
+        // la aberración achica su tamaño aparente (ángulo sólido ÷ D²), por eso el factor 1/D².
+        const bright = (s.mag * Math.expm1(x)) / Math.expm1(x / D) / (D * D);
         if (bright < 0.03) continue;
         const [r, g, b] = blackbody(s.T * D);
         const a = Math.min(1, bright);
@@ -192,7 +198,7 @@ export function RelativisticSky(props: SkyProps) {
           for (let k = -2; k <= 2; k++) ctx.fillRect(cx - rr, cy + k * rr * 0.32, rr * 2, rr * 0.12);
         }
       } else {
-        const T = aheadKind === "sun" ? 5_800 : aheadKind === "galaxy" ? 6_000 : 9_000;
+        const T = aheadTemp ?? (aheadKind === "sun" ? 5_772 : aheadKind === "galaxy" ? 6_000 : 9_000);
         const x = X_VIS / T;
         const boost = Math.expm1(x) / Math.expm1(x / D0);
         const angular = aheadKind === "galaxy" ? Math.min(0.9, 60_000 * near) : Math.min(0.5, 0.004 * near);
@@ -217,6 +223,25 @@ export function RelativisticSky(props: SkyProps) {
           ctx.arc(cx, cy, glow, 0, Math.PI * 2);
           ctx.fill();
         }
+      }
+
+      // Guías (vista grande): el horizonte de 90° del marco en reposo y los rótulos adelante/atrás.
+      if (guides) {
+        ctx.font = "12px ui-sans-serif, system-ui";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(226,232,240,0.75)";
+        ctx.fillText("adelante", cx, cy + Math.min(60, R * 0.12) + 14);
+        ctx.fillText("atrás (borde)", cx, cy + R * 0.97 - 8 > h ? h - 10 : cy + R * 0.97 - 8);
+        const side = 2 * Math.atan(eM); // donde aparece lo que en reposo estaba a 90°, al costado
+        const rs = radius(side);
+        ctx.setLineDash([2, 4]);
+        ctx.strokeStyle = "rgba(103,232,249,0.7)";
+        ctx.beginPath();
+        ctx.arc(cx, cy, rs, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(103,232,249,0.9)";
+        ctx.fillText("lo que estaba al costado", cx, cy - rs - 6);
       }
 
       // Atmósfera terrestre durante el despegue.
