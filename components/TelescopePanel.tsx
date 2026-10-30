@@ -34,7 +34,7 @@ function dopplerTint(D: number) {
 }
 
 /** Lo que se ve por el ocular: la nave de espaldas, con la luz corrida por el Doppler y atrasada. */
-function Eyepiece({ D, engines, seenDay, t }: { D: number; engines: boolean; seenDay: number; t: number }) {
+function Eyepiece({ D, engines, seenDay, t, front }: { D: number; engines: boolean; seenDay: number; t: number; front: boolean }) {
   const tint = dopplerTint(D);
   const bright = Math.max(0.15, Math.min(1.4, D ** 1.5));
   const flicker = 0.8 + Math.sin(t * 20) * 0.2;
@@ -57,8 +57,33 @@ function Eyepiece({ D, engines, seenDay, t }: { D: number; engines: boolean; see
           const y = Math.cos(i * 37.3) * 90;
           return <circle key={i} cx={x} cy={y} r={i % 7 === 0 ? 1 : 0.5} fill={tint.color} opacity={0.6} />;
         })}
-        {/* La nave vista desde atrás (se aleja o se acerca en línea recta) */}
-        <g opacity={Math.min(1, bright)}>
+        {/* De frente: la nariz y el parabrisas de la cabina, con Tomás adentro y las luces de aproximación */}
+        {front && (
+          <g opacity={Math.min(1, bright)}>
+            <path d="M-34 -22 L-22 -34 L22 -34 L34 -22 L34 22 L22 34 L-22 34 L-34 22Z" fill="#52525b" stroke="#1e1b2e" strokeWidth="2" />
+            <path d="M-26 -14 L-16 -24 L16 -24 L26 -14 L26 14 L16 24 L-16 24 L-26 14Z" fill="#71717a" stroke="#1e1b2e" strokeWidth="1.2" />
+            <circle r="9" fill="#a1a1aa" stroke="#1e1b2e" strokeWidth="1.2" />
+            <circle r="3" cx="-2" cy="-2" fill="#e4e4e7" opacity="0.7" />
+            {/* Parabrisas con la luz de la cabina y la silueta de Tomás */}
+            <path d="M-18 -30 L18 -30 L14 -20 L-14 -20Z" fill={tint.color} opacity="0.9" stroke="#1e1b2e" strokeWidth="1" />
+            <circle cx="0" cy="-24" r="3.2" fill="#1e293b" />
+            <path d="M-5 -20 q5 -5 10 0Z" fill="#1e293b" />
+            <text x="0" y="28" fontSize="6" textAnchor="middle" fill="#e4e4e7" fontFamily="monospace" fontWeight="bold">
+              D{Math.max(1, Math.floor(seenDay))}
+            </text>
+            {/* Luces de aproximación que parpadean */}
+            {[-28, 28].map((x) => (
+              <g key={x}>
+                <circle cx={x} cy="0" r="2.6" fill={Math.floor(t * 2) % 2 ? tint.color : "#3f3f46"} />
+                <circle cx={x} cy="0" r="7" fill={tint.color} opacity={Math.floor(t * 2) % 2 ? 0.25 : 0} />
+              </g>
+            ))}
+            {/* Con los motores encendidos se adivina el brillo detrás de la nave */}
+            {engines && <circle r={46 * flicker} fill={tint.color} opacity={0.12 * Math.min(1, bright)} />}
+          </g>
+        )}
+        {/* De espaldas: la tobera, con la llama si los motores apuntan hacia la Tierra */}
+        {!front && <g opacity={Math.min(1, bright)}>
           <path d="M-34 -22 L-22 -34 L22 -34 L34 -22 L34 22 L22 34 L-22 34 L-34 22Z" fill="#3f3f46" stroke="#1e1b2e" strokeWidth="2" />
           <path d="M-22 -34 L-34 -22 M22 -34 L34 -22" stroke="#a1a1aa" strokeWidth="1" opacity="0.6" />
           <rect x="-30" y="-4" width="60" height="4" fill="#f97316" opacity="0.8" />
@@ -71,7 +96,7 @@ function Eyepiece({ D, engines, seenDay, t }: { D: number; engines: boolean; see
           <circle r="13" cy="14" fill="#18181b" stroke="#52525b" strokeWidth="2" />
           {engines && <circle r={11 * flicker} cy="14" fill={tint.color} opacity={0.9 * Math.min(1, bright)} />}
           {engines && <circle r={22 * flicker} cy="14" fill={tint.color} opacity={0.25 * Math.min(1, bright)} />}
-        </g>
+        </g>}
         {/* Corrimiento de color de toda la imagen */}
         <rect x="-100" y="-100" width="200" height="200" fill={tint.overlay} opacity={0.35 * tint.strength} style={{ mixBlendMode: "color" }} />
         <circle r="92" fill="url(#vignette)" />
@@ -128,6 +153,11 @@ export function TelescopePanel({ sim, d }: { sim: Sim; d: Derived }) {
   const D = emit.phase.kind === "stay" ? trip.stayRate : 1 / (emit.gamma * (1 + emit.beta));
   const lightAge = ship.t - emit.t;
   const engines = emit.alpha !== 0;
+  // Hacia dónde apunta la nave en esa imagen: de espaldas si los motores empujan alejándola (acelera en la ida,
+  // crucero de ida) o si frena al volver (los motores apuntan a la Tierra); de frente en el resto del regreso
+  // y mientras frena al llegar al destino (dio media vuelta).
+  const ida = emit.phase.leg === "ida";
+  const front = (ida && emit.phase.kind === "decel") || (!ida && emit.phase.kind !== "decel");
   // Lo que se calcula para "ahora" en el marco de la Tierra.
   const gamma = ship.gamma;
   const contracted = SHIP_LENGTH_M / gamma;
@@ -138,7 +168,7 @@ export function TelescopePanel({ sim, d }: { sim: Sim; d: Derived }) {
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           <div className="hud-label mb-2 text-cyan-300">🔭 Lo que ve {EARTH_NAME} por el ocular</div>
-          <Eyepiece D={D} engines={engines} seenDay={seenTau * 365.25 + 1} t={t} />
+          <Eyepiece D={D} engines={engines} seenDay={seenTau * 365.25 + 1} t={t} front={front} />
           <ul className="mt-3 space-y-1 text-sm text-slate-300">
             <li>
               ⏳ Es una imagen <b>del pasado</b>: esa luz salió de la nave hace <b className="text-cyan-200">{formatYears(lightAge)}</b>, cuando estaba a{" "}
@@ -160,7 +190,16 @@ export function TelescopePanel({ sim, d }: { sim: Sim; d: Derived }) {
             <li>
               🎞 Por eso ve a {SHIP_NAME} moverse {D < 1 ? <>en <b>cámara lenta</b> (×{fmt(D, D < 0.1 ? 3 : 2)})</> : <>en <b>cámara rápida</b> (×{fmt(D, 1)})</>}: lo que ve no es solo la dilatación, también el retraso de la luz.
             </li>
-            {engines && <li>🔥 En esa imagen los motores están encendidos: la llama también cambia de color.</li>}
+            <li>
+              {front
+                ? ida
+                  ? "🛸 La nave se ve de frente: dio media vuelta y frena apuntando los motores hacia su destino."
+                  : "🛸 La nave viene de regreso y se ve de frente: el parabrisas de la cabina, con Tomás adentro, y las luces de aproximación."
+                : ida
+                  ? "🚀 La nave se ve de espaldas: se aleja con los motores apuntando a la Tierra."
+                  : "🚀 Se ve de espaldas aunque viene de vuelta: dio media vuelta y frena con los motores apuntando a la Tierra."}
+            </li>
+            {engines && <li>🔥 En esa imagen los motores están encendidos: su luz también cambia de color.</li>}
           </ul>
         </section>
 

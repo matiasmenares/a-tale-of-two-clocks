@@ -263,6 +263,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const turn = trip.phases.find((p) => p.leg === "vuelta");
   const turnSeenAt = turn ? stateAt(trip, turn.tau0).t + stateAt(trip, turn.tau0).x : Infinity;
   const welcome = sim.roundTrip && live && earthAlive && earthYears >= turnSeenAt;
+  // El cartel lo cuelga recién el último mes, cuando ya sabe que llega en días.
+  const untilArrival = Math.max(0, trip.totalT - earthYears);
+  const welcomeBanner = welcome && untilArrival < 30 / 365.25;
   const lifeEvent = live && calmE && earthAlive ? lifeEventAt(earthAge, sim.playing ? Math.max(30 / 365.25, sim.earthPlayback * 2) : 30 / 365.25) : null;
 
   // Sonido: solo lo que pasa a velocidad "humana" y con la simulación corriendo.
@@ -370,7 +373,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           onOpenClocks={() => onOpen("clocks")}
           onOpenTelescope={() => onOpen("telescope")}
           party={earthBirthday !== null}
-          welcome={welcome}
+          welcome={welcomeBanner}
         />
         <Hud accent="cyan" className="left-2 top-2 max-w-[min(25rem,calc(100%-1rem))] sm:left-3 sm:top-3">
           <div className="hud-label text-cyan-300">🌍 {EARTH_NAME} · Tierra</div>
@@ -400,7 +403,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           {lifeEvent && <div className="mt-0.5 text-xs text-violet-300">⭐ {lifeEvent}</div>}
           {welcome && (
             <div className="mt-0.5 text-xs text-emerald-300">
-              🔭 Vio que la nave dio la vuelta y prepara la bienvenida: llega en {formatYears(Math.max(0, trip.totalT - earthYears))}
+              {welcomeBanner
+                ? `🎉 Colgó el cartel de bienvenida: ${SHIP_NAME} llega en ${formatYears(untilArrival)}`
+                : `🔭 Vio por el telescopio que la nave dio la vuelta: llega en ${formatYears(untilArrival)}`}
             </div>
           )}
           {greetFromShip && (
