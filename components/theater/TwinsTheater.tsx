@@ -85,6 +85,10 @@ function Hud({ children, className = "", accent }: { children: ReactNode; classN
   );
 }
 
+/** Barra segmentada de la consola: varios controles en una sola pastilla con divisiones. */
+const SEGMENTS = "flex items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] divide-x divide-white/10";
+const SEG = "flex h-7 items-center gap-1.5 px-2.5 text-slate-200";
+
 /** Lo que se esconde en pantallas chicas (celular vertical o apaisado) para no tapar las escenas. */
 const SECONDARY = "max-sm:hidden [@media(max-height:520px)]:hidden";
 
@@ -301,7 +305,12 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
     const shipDeath = tauAtBio(trip, deathYears, sim.sleep);
     if (shipDeath < trip.totalTau) list.push({ tau: shipDeath, icon: "✝️", label: `Muere ${SHIP_NAME}` });
     list.push({ tau: trip.totalTau, icon: sim.roundTrip ? "🤝" : "🏁", label: sim.roundTrip ? "Reencuentro" : "Fin del viaje" });
-    return list;
+    // Que no se encimen: primero los hitos del viaje y las muertes; los cumpleaños solo si hay espacio.
+    const gap = trip.totalTau * 0.05;
+    const shown: typeof list = [];
+    for (const m of [...list.filter((x) => x.icon !== "🎂"), ...list.filter((x) => x.icon === "🎂")])
+      if (shown.every((o) => Math.abs(o.tau - m.tau) > gap)) shown.push(m);
+    return shown;
   })();
 
   // Bandeja de mensajes semanales de Martín: con el Doppler llegan a cuentagotas al alejarse y de golpe al volver.
@@ -345,7 +354,6 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const countdown = stage === "cinematic" ? Math.ceil(CINEMATIC_SECONDS - cinematicTime) : 0;
 
   const progress = trip.totalTau > 0 ? Math.min(1, shipYears / trip.totalTau) : 0;
-  const chip = "flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1";
 
   return (
     <section className="relative flex h-[100svh] flex-col overflow-hidden bg-black [@media(min-height:520px)]:min-h-[560px]">
@@ -434,137 +442,151 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
       <div className="relative z-10 border-y border-white/10 bg-gradient-to-b from-[#0b1222] to-[#050913] px-3 pb-2 pt-1.5 text-xs text-slate-200 shadow-[0_0_40px_rgba(0,0,0,0.9)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent" />
-        <div className="flex flex-wrap items-center justify-center gap-1.5">
-          <span className="hud-label hidden text-slate-500 2xl:inline">Misión TERRA-1</span>
-          <button
-            onClick={sim.togglePlay}
-            className="rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-1.5 font-semibold text-slate-950 shadow-[0_0_20px_-4px_rgba(251,146,60,0.9)] transition hover:brightness-110"
-          >
-            {stage === "boarding" ? "🚀 Subir al cohete" : stage === "done" ? "↺ Repetir" : sim.playing ? "⏸ Pausa" : "▶ Seguir"}
-          </button>
-          <button onClick={sim.reset} className="rounded-full border border-white/15 px-3 py-1.5 text-slate-300 transition hover:border-white/40 hover:text-white">
-            Reiniciar
-          </button>
-          <label className={chip}>
-            <span className="hud-label text-slate-400">Destino</span>
-            <select
-              value={destination.id}
-              onChange={(e) => sim.setDestination(DESTINATIONS.find((x) => x.id === e.target.value)!)}
-              className="bg-transparent font-medium text-white outline-none [&>option]:bg-slate-900"
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {/* Reproducción */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={sim.togglePlay}
+              className="rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-1.5 font-semibold text-slate-950 shadow-[0_0_20px_-4px_rgba(251,146,60,0.9)] transition hover:brightness-110"
             >
-              {destination.id === "custom" && <option value="custom">{formatLy(destination.distance)} (personalizado)</option>}
-              {DESTINATIONS.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name} · {formatLy(x.distance)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className={`${chip} cursor-pointer ${SECONDARY}`}>
-            <input type="checkbox" checked={sim.roundTrip} onChange={(e) => sim.setRoundTrip(e.target.checked)} className="accent-cyan-400" />
-            <span className="hidden lg:inline">ida y vuelta</span><span className="lg:hidden">↩</span>
-          </label>
-          <label className={`${chip} ${SECONDARY}`}>
-            <span className="hud-label text-slate-400">Ritmo</span>
-            <input
-              type="range"
-              min={-7.5}
-              max={4}
-              step={0.01}
-              value={Math.log10(sim.rate)}
-              onChange={(e) => sim.setRate(10 ** Number(e.target.value))}
-              className="w-20"
-            />
-            <span className="w-[4.6rem] whitespace-nowrap font-mono text-cyan-200">{formatPlayback(sim.rate)}/s</span>
-          </label>
-          <label
-            className={`${chip} ${SECONDARY} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
-            title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo casi no envejece (animación suspendida)" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
-          >
-            <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
-            ❄️ <span className="hidden xl:inline">hipersueño</span>
-          </label>
-          <label className={`${chip} cursor-pointer ${SECONDARY}`} title="Cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
-            <input type="checkbox" checked={sim.director} onChange={(e) => sim.setDirector(e.target.checked)} className="accent-cyan-400" />
-            🎬 <span className="hidden xl:inline">director</span>
-          </label>
-          <button onClick={() => onOpen("map")} title="Mapa" aria-label="Mapa" className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}>
-            🗺 <span className="hidden xl:inline">Mapa</span>
-          </button>
-          <button onClick={() => onOpen("control")} title="Control" aria-label="Control" className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}>
-            ⚙ <span className="hidden xl:inline">Control</span>
-          </button>
-          <button onClick={() => onOpen("data")} title="Datos" aria-label="Datos" className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}>
-            📊 <span className="hidden xl:inline">Datos</span>
-          </button>
-          <button
-            onClick={() => setSound((v) => !v)}
-            title={sound ? "Silenciar" : "Activar sonido: despegue, cabina, lluvia, guitarra, violín y cumpleaños"}
-            aria-label={sound ? "Silenciar" : "Activar sonido"}
-            className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}
-          >
-            {sound ? "🔊" : "🔇"}
-          </button>
-          <button
-            onClick={async () => {
-              const url = sim.shareUrl();
-              try {
-                await navigator.clipboard.writeText(url);
-              } catch {
-                window.prompt("Copia este link", url);
-              }
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1800);
-            }}
-            title="Copiar un link a este viaje en este momento"
-            aria-label="Compartir"
-            className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}
-          >
-            {copied ? "✓" : "🔗"} <span className="hidden xl:inline">{copied ? "Copiado" : "Compartir"}</span>
-          </button>
+              {stage === "boarding" ? "🚀 Subir al cohete" : stage === "done" ? "↺ Repetir" : sim.playing ? "⏸ Pausa" : "▶ Seguir"}
+            </button>
+            <button onClick={sim.reset} title="Reiniciar" aria-label="Reiniciar" className="rounded-full border border-white/15 px-3 py-1.5 text-slate-300 transition hover:border-white/40 hover:text-white">
+              <span className="max-sm:hidden">Reiniciar</span>
+              <span className="sm:hidden">↺</span>
+            </button>
+          </div>
+          {/* Viaje: destino y ajustes, en una sola barra segmentada (en el celular va abajo, en su propia fila) */}
+          <div className={`${SEGMENTS} max-sm:order-2`}>
+            <label className={`${SEG} min-w-0`}>
+              <span className="hud-label text-slate-400">Destino</span>
+              <select
+                value={destination.id}
+                onChange={(e) => sim.setDestination(DESTINATIONS.find((x) => x.id === e.target.value)!)}
+                className="max-w-[11rem] truncate bg-transparent font-medium text-white outline-none sm:max-w-[15rem] [&>option]:bg-slate-900"
+              >
+                {destination.id === "custom" && <option value="custom">{formatLy(destination.distance)} (personalizado)</option>}
+                {DESTINATIONS.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name} · {formatLy(x.distance)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className={`${SEG} cursor-pointer ${SECONDARY}`} title="Ida y vuelta: Tomás regresa a la Tierra">
+              <input type="checkbox" checked={sim.roundTrip} onChange={(e) => sim.setRoundTrip(e.target.checked)} className="accent-cyan-400" />
+              ↩ <span className="hidden 2xl:inline">ida y vuelta</span>
+            </label>
+            <label className={`${SEG} ${SECONDARY}`} title="Cuánto tiempo pasa por cada segundo real">
+              <span className="hud-label text-slate-400">Ritmo</span>
+              <input
+                type="range"
+                min={-7.5}
+                max={4}
+                step={0.01}
+                value={Math.log10(sim.rate)}
+                onChange={(e) => sim.setRate(10 ** Number(e.target.value))}
+                className="w-20"
+              />
+              <span className="w-[4.6rem] whitespace-nowrap font-mono text-cyan-200">{formatPlayback(sim.rate)}/s</span>
+            </label>
+            <label
+              className={`${SEG} ${SECONDARY} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
+              title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo casi no envejece (animación suspendida)" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
+            >
+              <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
+              ❄️ <span className="hidden 2xl:inline">hipersueño</span>
+            </label>
+            <label className={`${SEG} cursor-pointer ${SECONDARY}`} title="Director: cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
+              <input type="checkbox" checked={sim.director} onChange={(e) => sim.setDirector(e.target.checked)} className="accent-cyan-400" />
+              🎬 <span className="hidden 2xl:inline">director</span>
+            </label>
+          </div>
+          {/* Paneles y herramientas: solo íconos (con nombre en pantallas muy anchas) */}
+          <div className={SEGMENTS}>
+            <button onClick={() => onOpen("map")} title="Mapa" aria-label="Mapa" className={`${SEG} transition hover:bg-white/10`}>
+              🗺 <span className="hidden 2xl:inline">Mapa</span>
+            </button>
+            <button onClick={() => onOpen("control")} title="Control" aria-label="Control" className={`${SEG} transition hover:bg-white/10`}>
+              ⚙ <span className="hidden 2xl:inline">Control</span>
+            </button>
+            <button onClick={() => onOpen("data")} title="Datos" aria-label="Datos" className={`${SEG} transition hover:bg-white/10`}>
+              📊 <span className="hidden 2xl:inline">Datos</span>
+            </button>
+            <button
+              onClick={() => setSound((v) => !v)}
+              title={sound ? "Silenciar" : "Activar sonido: despegue, cabina, lluvia, guitarra, violín y cumpleaños"}
+              aria-label={sound ? "Silenciar" : "Activar sonido"}
+              className={`${SEG} transition hover:bg-white/10`}
+            >
+              {sound ? "🔊" : "🔇"}
+            </button>
+            <button
+              onClick={async () => {
+                const url = sim.shareUrl();
+                try {
+                  await navigator.clipboard.writeText(url);
+                } catch {
+                  window.prompt("Copia este link", url);
+                }
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1800);
+              }}
+              title="Copiar un link a este viaje en este momento"
+              aria-label="Compartir"
+              className={`${SEG} transition hover:bg-white/10`}
+            >
+              {copied ? "✓" : "🔗"}
+            </button>
+          </div>
           {countdown > 0 && countdown <= 10 && <span className="glow-amber font-mono text-lg font-bold text-amber-300">T−{countdown}</span>}
         </div>
         {/* Línea de tiempo de la misión por fases: se puede arrastrar para moverse por el viaje */}
-        <div className="mx-auto mt-1.5 flex max-w-5xl items-center gap-2">
-          <span className="hud-label w-12 shrink-0 text-right text-slate-500">T+0</span>
-          <div className="relative h-5 flex-1">
-            <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/5">
-              {trip.phases.map((p, i) =>
-                p.tau1 > p.tau0 ? (
-                  <div
-                    key={i}
-                    className="absolute inset-y-0"
-                    style={{ left: `${(p.tau0 / trip.totalTau) * 100}%`, width: `${((p.tau1 - p.tau0) / trip.totalTau) * 100}%`, background: PHASE_COLOR[p.kind], opacity: 0.35 }}
-                  />
-                ) : null,
-              )}
-              <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-amber-300" style={{ width: `${progress * 100}%` }} />
+        <div className="mx-auto mt-1 flex max-w-5xl items-end gap-2">
+          <span className="hud-label w-12 shrink-0 pb-1 text-right text-slate-500">T+0</span>
+          <div className="flex-1">
+            {/* Carril de momentos clave sobre la barra: un clic salta directo a cada uno */}
+            <div className="relative h-4">
+              {marks.map((m) => (
+                <button
+                  key={m.label}
+                  onClick={() => sim.seek(m.tau)}
+                  title={m.label}
+                  aria-label={m.label}
+                  className="group absolute bottom-0 flex -translate-x-1/2 flex-col items-center"
+                  style={{ left: `${(m.tau / trip.totalTau) * 100}%` }}
+                >
+                  <span className="text-[11px] leading-none opacity-75 transition group-hover:scale-125 group-hover:opacity-100">{m.icon}</span>
+                  <span className="h-1 w-px bg-white/30" />
+                </button>
+              ))}
             </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.0005}
-              value={progress}
-              onChange={(e) => sim.seek(Number(e.target.value) * trip.totalTau)}
-              aria-label="Progreso del viaje"
-              className="timeline absolute inset-0 h-full w-full"
-            />
-            {/* Momentos clave: un clic salta directo a cada uno */}
-            {marks.map((m) => (
-              <button
-                key={m.label}
-                onClick={() => sim.seek(m.tau)}
-                title={m.label}
-                aria-label={m.label}
-                className="absolute -top-3 z-10 -translate-x-1/2 text-[11px] leading-none opacity-80 transition hover:scale-125 hover:opacity-100"
-                style={{ left: `${(m.tau / trip.totalTau) * 100}%` }}
-              >
-                {m.icon}
-              </button>
-            ))}
+            <div className="relative h-5">
+              <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/5">
+                {trip.phases.map((p, i) =>
+                  p.tau1 > p.tau0 ? (
+                    <div
+                      key={i}
+                      className="absolute inset-y-0"
+                      style={{ left: `${(p.tau0 / trip.totalTau) * 100}%`, width: `${((p.tau1 - p.tau0) / trip.totalTau) * 100}%`, background: PHASE_COLOR[p.kind], opacity: 0.35 }}
+                    />
+                  ) : null,
+                )}
+                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-400 to-amber-300" style={{ width: `${progress * 100}%` }} />
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.0005}
+                value={progress}
+                onChange={(e) => sim.seek(Number(e.target.value) * trip.totalTau)}
+                aria-label="Progreso del viaje"
+                className="timeline absolute inset-0 h-full w-full"
+              />
+            </div>
           </div>
-          <span className="hud-label w-16 shrink-0 text-slate-400">{Math.round(progress * 100)} %</span>
+          <span className="hud-label w-16 shrink-0 pb-1 text-slate-400">{Math.round(progress * 100)} %</span>
         </div>
       </div>
 
