@@ -169,16 +169,19 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const winE = sim.playing ? Math.min(0.5, Math.max(1 / 365.25, sim.earthPlayback * 2)) : 1 / 365.25;
   const winS = sim.playing ? Math.min(0.5, Math.max(1 / 365.25, sim.shipPlayback * 2)) : 1 / 365.25;
   const live = stage === "flight";
+  // Con el ritmo muy alto (más de un año por segundo) los cumpleaños serían una fiesta continua: no se muestran.
+  const calmE = !sim.playing || sim.earthPlayback <= 1;
+  const calmS = !sim.playing || sim.shipPlayback <= 1;
   const kEarth = Math.floor(earthYears);
-  const earthBirthday = live && earthAlive && kEarth >= 1 && earthYears - kEarth < winE ? START_AGE + kEarth : null;
+  const earthBirthday = live && calmE && earthAlive && kEarth >= 1 && earthYears - kEarth < winE ? START_AGE + kEarth : null;
   // Saludos de cumpleaños: cada uno graba un mensaje el día que cumple, y le llega al otro cuando llega esa luz.
   const kFromEarth = Math.floor(d.earthSeenFromShip);
   const greetFromEarth =
-    live && shipAlive && !cryo && kFromEarth >= 1 && kFromEarth < deathYears && shipYears - arrivalTau(trip, kFromEarth) < winS ? kFromEarth : null;
+    live && calmS && shipAlive && !cryo && kFromEarth >= 1 && kFromEarth < deathYears && shipYears - arrivalTau(trip, kFromEarth) < winS ? kFromEarth : null;
   const kFromShip = Math.floor(d.shipSeenFromEarth);
   const sent = kFromShip >= 1 ? stateAt(trip, kFromShip) : null;
   const greetFromShip =
-    live && earthAlive && sent && bioYears(trip, kFromShip, sim.sleep) < deathYears && !inCryo(trip, kFromShip, sim.sleep) && earthYears - (sent.t + sent.x) < winE
+    live && calmE && earthAlive && sent && bioYears(trip, kFromShip, sim.sleep) < deathYears && !inCryo(trip, kFromShip, sim.sleep) && earthYears - (sent.t + sent.x) < winE
       ? { age: Math.floor(START_AGE + bioYears(trip, kFromShip, sim.sleep)), sentAt: sent.t }
       : null;
 
