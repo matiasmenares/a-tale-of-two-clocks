@@ -536,7 +536,7 @@ function CryoPod({ age, t }: { age: number; t: number }) {
       <rect x={x0 + 146} y={GROUND - 74} width="40" height="30" rx="3" fill="#0f172a" stroke={INK} strokeWidth="1.4" />
       <line x1={x0 + 166} y1={GROUND - 44} x2={x0 + 166} y2={GROUND} stroke="#475569" strokeWidth="3" />
       <text x={x0 + 150} y={GROUND - 65} fontSize="5" fill="#7dd3fc" fontFamily="monospace">CRIO −5 °C</text>
-      <text x={x0 + 150} y={GROUND - 57} fontSize="5" fill={beat ? "#f87171" : "#86efac"} fontFamily="monospace">♥ 10/min</text>
+      <text x={x0 + 150} y={GROUND - 57} fontSize="5" fill={beat ? "#f87171" : "#86efac"} fontFamily="monospace">♥ 1/día</text>
       <path d={`M${x0 + 150} ${GROUND - 50} h10 ${beat ? "l2 -5 l2 8 l2 -3" : "h6"} h14`} stroke="#22c55e" strokeWidth="0.9" fill="none" />
       <text x={x0 + 100} y={GROUND - 88} fontSize="7" fill="#e0f2fe" opacity="0.8">❄ z</text>
     </g>

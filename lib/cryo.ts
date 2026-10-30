@@ -3,8 +3,11 @@
 
 import type { Trip } from "./relativity";
 
-/** En hipersueño el cuerpo envejece un día por cada cien. */
-export const CRYO_RATE = 0.01;
+/**
+ * Animación suspendida: el cuerpo envejece ~1 segundo cada 30 años. Tiene que ser así de lento para
+ * que Tomás sobreviva incluso al viaje al cuásar (casi 500 millones de años de crucero).
+ */
+export const CRYO_RATE = 1e-9;
 
 /**
  * Tramos del tiempo propio de la nave [desde, hasta) en que el hipersueño estuvo activado.

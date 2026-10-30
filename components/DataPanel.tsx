@@ -159,7 +159,7 @@ function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
         <Row
           label="Latidos de Tomás desde el despegue"
           value={big(heartbeats(bioYears(trip, d.shipProper, sim.sleep)))}
-          note={`${big(heartbeats(d.earthProper) - heartbeats(bioYears(trip, d.shipProper, sim.sleep)))} menos que Martín${sim.sleep.length ? " (en hipersueño su corazón late 100 veces más lento)" : ""}`}
+          note={`${big(heartbeats(d.earthProper) - heartbeats(bioYears(trip, d.shipProper, sim.sleep)))} menos que Martín${sim.sleep.length ? " (en hipersueño su corazón casi no late)" : ""}`}
         />
       </section>
 

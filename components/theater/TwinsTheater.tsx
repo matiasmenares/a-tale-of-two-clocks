@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { techAt } from "@/lib/tech";
 import { arrivalTau, earthToShip, shipToEarth } from "@/lib/comms";
-import { bioYears, inCryo } from "@/lib/cryo";
+import { bioYears, inCryo, tauAtBio } from "@/lib/cryo";
 import { StarMap } from "../StarMap";
 import { EarthScene } from "./EarthScene";
 import { ShipScene } from "./ShipScene";
@@ -100,6 +100,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const shipAge = START_AGE + Math.min(shipBio, deathYears);
   const earthAlive = earthYears < deathYears;
   const shipAlive = shipBio < deathYears;
+  // Lo sacaron del hipersueño y, despierto, no le alcanza la vida para terminar el viaje.
+  const doomed = flying && stage === "flight" && shipAlive && !sim.hypersleep && sim.sleep.length > 0 && tauAtBio(trip, deathYears, sim.sleep) < trip.totalTau;
   const earthTimelapse = sim.playing && stage === "flight" && sim.earthPlayback * 365.25 > 1;
   const shipTimelapse = sim.playing && stage === "flight" && sim.shipPlayback * 365.25 > 1;
   const epoch = earthEpoch(earthYears, deathYears);
@@ -254,7 +256,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           </label>
           <label
             className={`${chip} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
-            title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo envejece 1 día cada 100" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
+            title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo casi no envejece (animación suspendida)" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
           >
             <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
             ❄️ <span className="hidden xl:inline">hipersueño</span>
@@ -347,12 +349,15 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {destination.miller && ship.phase.kind === "stay" && stage === "flight" && shipAlive && (
               <> · 🌊 En el planeta de Miller: cada hora suya son 7 años de {EARTH_NAME}</>
             )}
-            {cryo && shipAlive && <span className="text-sky-200"> · ❄️ En hipersueño: su cuerpo envejece 1 día cada 100</span>}
+            {cryo && shipAlive && <span className="text-sky-200"> · ❄️ En hipersueño: su cuerpo casi no envejece</span>}
             {!cryo && !surfaceAct && !(destination.miller && ship.phase.kind === "stay") && shipAct && flying && !reunion && !shipTimelapse && shipYears * SEC_PER_YEAR > 3_600 && (
               <>
                 {" "}· {ship.phase.kind === "cruise" && shipAct.pose !== "sleep" ? `flotando — ${shipAct.label.toLowerCase()}` : shipAct.label}
                 {shipAct.pose === "violin" && <span className="text-amber-300"> (nivel {violinLevel})</span>}
               </>
+            )}
+            {doomed && (
+              <div className="text-xs text-amber-300">⚠️ Despierto no le alcanza la vida para terminar el viaje: vuelve a activar ❄️ hipersueño.</div>
             )}
             {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
