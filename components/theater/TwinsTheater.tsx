@@ -1,6 +1,6 @@
 "use client";
 
-import { DESTINATIONS, PHASE_LABEL } from "@/lib/relativity";
+import { DESTINATIONS, PHASE_LABEL, stateAt } from "@/lib/relativity";
 import { CINEMATIC_SECONDS, type Sim } from "@/hooks/useSimulation";
 import { START_AGE, type Derived } from "@/lib/derive";
 import { fmt, formatAge, formatBeta, formatFactor, formatLy, formatPlayback, formatYears } from "@/lib/format";
@@ -145,6 +145,27 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
 
   const toShip = earthToShip(trip, ship, sim.sleep);
 
+  // Cumpleaños: los gemelos despegaron el día que cumplían 30, así que cada uno cumple años cuando su propio
+  // reloj completa un año más. El aviso dura ~2 s reales aunque el ritmo sea rápido (y al menos un día).
+  // En pausa vale solo el día exacto, para no ver fiestas al revisar el viaje con la barra.
+  const winE = sim.playing ? Math.min(0.5, Math.max(1 / 365.25, sim.earthPlayback * 2)) : 1 / 365.25;
+  const winS = sim.playing ? Math.min(0.5, Math.max(1 / 365.25, sim.shipPlayback * 2)) : 1 / 365.25;
+  const live = stage === "flight";
+  const kEarth = Math.floor(earthYears);
+  const earthBirthday = live && earthAlive && kEarth >= 1 && earthYears - kEarth < winE ? START_AGE + kEarth : null;
+  const kShip = Math.floor(shipYears);
+  const shipBirthday = live && shipAlive && !cryo && kShip >= 1 && shipYears - kShip < winS ? kShip : null;
+  // Saludos de cumpleaños: cada uno graba un mensaje el día que cumple, y le llega al otro cuando llega esa luz.
+  const kFromEarth = Math.floor(d.earthSeenFromShip);
+  const greetFromEarth =
+    live && shipAlive && !cryo && kFromEarth >= 1 && kFromEarth < deathYears && shipYears - arrivalTau(trip, kFromEarth) < winS ? kFromEarth : null;
+  const kFromShip = Math.floor(d.shipSeenFromEarth);
+  const sent = kFromShip >= 1 ? stateAt(trip, kFromShip) : null;
+  const greetFromShip =
+    live && earthAlive && sent && bioYears(trip, kFromShip, sim.sleep) < deathYears && !inCryo(trip, kFromShip, sim.sleep) && earthYears - (sent.t + sent.x) < winE
+      ? { age: Math.floor(START_AGE + bioYears(trip, kFromShip, sim.sleep)), sentAt: sent.t }
+      : null;
+
   // Hacia dónde mira la cámara en pantallas angostas: el personaje o lo que está pasando.
   const placeX = (a: { place: number; walkingFrom?: number; walkT?: number }) =>
     (a.walkingFrom !== undefined ? a.walkingFrom + (a.place - a.walkingFrom) * (a.walkT ?? 0) : a.place) * 800;
@@ -204,6 +225,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           earthAlive={earthAlive}
           souvenir={sim.roundTrip && destination.planet && shipAlive ? { color: destination.planet.rock, from: destination.name } : undefined}
           focusX={earthFocus}
+          party={earthBirthday !== null}
         />
         <Hud accent="cyan" className="left-2 top-2 max-w-[min(25rem,calc(100%-1rem))] sm:left-3 sm:top-3">
           <div className="hud-label text-cyan-300">🌍 {EARTH_NAME} · Tierra</div>
@@ -221,6 +243,12 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             )}
             {earthAlive && earthTimelapse && <> · los días pasan volando</>}
           </div>
+          {earthBirthday && <div className="mt-0.5 text-xs font-semibold text-pink-300">🎂 ¡Cumple {earthBirthday} años! Fiesta con la familia</div>}
+          {greetFromShip && (
+            <div className="mt-0.5 text-xs text-amber-200">
+              📨 Llegó el saludo que {SHIP_NAME} grabó al cumplir {greetFromShip.age}: la luz tardó {formatYears(earthYears - greetFromShip.sentAt)}
+            </div>
+          )}
           {loss && <div className="mt-0.5 text-xs text-rose-300">💔 Está triste: murió {loss.name}. Sus cenizas quedaron en una urna en el estante.</div>}
           {epoch.note && <div className={`mt-0.5 text-xs text-slate-400 ${SECONDARY}`}>{epoch.note}</div>}
           {flying && techAt(LAUNCH_YEAR + Math.floor(earthYears)).level > 0 && (
@@ -364,6 +392,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           cryo={cryo}
           outside={{ years: earthYears, deathYears }}
           focusX={shipFocus}
+          party={shipBirthday !== null}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
         />
@@ -395,6 +424,13 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             )}
             {doomed && (
               <div className="text-xs text-amber-300">⚠️ Despierto no le alcanza la vida para terminar el viaje: vuelve a activar ❄️ hipersueño.</div>
+            )}
+            {shipBirthday && <div className="text-xs font-semibold text-pink-300">🎂 ¡Cumple {Math.floor(shipAge)} años! Celebra solo en la nave</div>}
+            {greetFromEarth && (
+              <div className="text-xs text-cyan-200">
+                📨 Llegó el saludo que {EARTH_NAME} grabó al cumplir {START_AGE + greetFromEarth}: la luz tardó {formatYears(ship.t - greetFromEarth)}
+                {!earthAlive && " — en la Tierra, él ya murió"}
+              </div>
             )}
             {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}

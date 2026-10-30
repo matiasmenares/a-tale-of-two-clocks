@@ -1,6 +1,6 @@
 import { activityAt, earthEpoch, hourOfDay, musicSkill, practiceHours, SHIP_NAME, SHIP_PLACES, surfaceActivity } from "@/lib/life";
 import type { PhaseKind, PlanetInfo } from "@/lib/relativity";
-import { OUTDOOR_LIGHT, Outdoors } from "./EarthScene";
+import { Balloons, Bunting, Confetti, OUTDOOR_LIGHT, Outdoors } from "./EarthScene";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { RelativisticSky, type SkyProps } from "./RelativisticSky";
 import { useFocusView } from "./useFocusView";
@@ -41,6 +41,8 @@ export interface ShipSceneProps {
   outside?: { years: number; deathYears: number };
   /** Dónde mira la cámara cuando la pantalla es angosta (coordenada x de la escena). */
   focusX?: number;
+  /** Es el cumpleaños de Tomás: lo celebra solo en la cabina. */
+  party?: boolean;
 }
 
 /** Brazo de acceso de la tripulación, en lo alto de la torre, hasta la escotilla de la Ranger. */
@@ -661,6 +663,8 @@ function Cabin({ props }: { props: ShipSceneProps }) {
   const violin = musicSkill(practiceHours("ship", years));
   const mood: Mood = props.sadNews
     ? "sad"
+    : props.party
+      ? "joy"
     : act.pose === "violin"
       ? violin.skill < 0.2
         ? Math.sin(gestureT * 1.3) > 0.4 ? "sour" : "focused"
@@ -683,6 +687,28 @@ function Cabin({ props }: { props: ShipSceneProps }) {
         t={gestureT}
         sparks={repairing && !timelapse}
       />
+      {/* Cumpleaños en la nave: guirnalda, globos y un muffin con vela sobre la mesa */}
+      {props.party && alive && !props.cryo && (
+        <>
+          <Bunting x0={410} x1={600} y={100} t={gestureT} text={`¡FELIZ CUMPLE ${Math.floor(age)}!`} />
+          <Balloons x={222} base={GROUND - 54} t={gestureT} drift={weightless} />
+          <g transform={`translate(272 ${GROUND - 54})`}>
+            <path d="M-7 0 L-6 -8 L6 -8 L7 0Z" fill="#a16207" stroke={INK} strokeWidth="1.2" />
+            <path d="M-7 -8 Q-7 -15 0 -15 Q7 -15 7 -8Z" fill="#fbcfe8" stroke={INK} strokeWidth="1.2" />
+            <rect x="-1" y="-22" width="2" height="7" fill="#60a5fa" />
+            {weightless ? (
+              // Sin gravedad no hay convección: la llama es una esfera azulada y tenue.
+              <>
+                <circle cx="0" cy="-25" r={3.4 + Math.sin(gestureT * 3) * 0.3} fill="#60a5fa" opacity="0.35" />
+                <circle cx="0" cy="-25" r="1.8" fill="#bfdbfe" opacity="0.8" />
+              </>
+            ) : (
+              <ellipse cx="0" cy={-25 + Math.sin(gestureT * 9) * 0.5} rx="1.6" ry="3" fill="#fbbf24" />
+            )}
+          </g>
+          <Confetti t={gestureT} drift={weightless} />
+        </>
+      )}
       {/* Luz de crecimiento del huerto cuando lo cuida */}
       {gardening && !props.cryo && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} />}
       {weightless && alive && !timelapse && !props.cryo && <FloatingStuff t={gestureT} />}

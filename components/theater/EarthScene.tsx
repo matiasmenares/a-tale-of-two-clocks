@@ -36,6 +36,8 @@ export interface EarthSceneProps {
   souvenir?: { color: string; from: string };
   /** Dónde mira la cámara cuando la pantalla es angosta (coordenada x de la escena). */
   focusX?: number;
+  /** Es el cumpleaños de Martín: fiesta en casa. */
+  party?: boolean;
 }
 
 function Sky({ hour, timelapse, ice = 0, id }: { hour: number; timelapse: boolean; ice?: number; id: string }) {
@@ -388,6 +390,7 @@ function Home({ props }: { props: EarthSceneProps }) {
   // En sus dos últimos años lo cuida un robot enfermera.
   const nearDeath = deathYears - years < 2;
   const loss = recentPetLoss(years);
+  const party = !!props.party && !dying;
   const cat = !dying ? catAt(years) : null;
   const guitar = musicSkill(practiceHours("earth", years));
   const act = dying ? null : activityAt("earth", years, age);
@@ -415,6 +418,8 @@ function Home({ props }: { props: EarthSceneProps }) {
   // Emoción de Martín según lo que hace y lo que le pasa.
   const mood: Mood = loss
     ? "sad"
+    : party
+      ? "joy"
     : nearDeath
       ? "tired"
       : act?.pose === "guitar"
@@ -453,7 +458,6 @@ function Home({ props }: { props: EarthSceneProps }) {
   const showRobot = nearDeath || tech.robot || (tech.level >= 1 && age >= 80);
   const cal = calendar(years);
   const christmas = cal.dayOfYear >= 352;
-  const birthday = cal.dayOfYear >= 120 && cal.dayOfYear < 121;
   const winter = cal.dayOfYear >= 152 && cal.dayOfYear < 244; // invierno austral
   // Martín tiene perro solo en dos etapas de su vida.
   const pet = dogAt(years);
@@ -574,12 +578,14 @@ function Home({ props }: { props: EarthSceneProps }) {
       <rect x="40" y={GROUND - 22} width="138" height="16" fill="#92400e" stroke={INK} strokeWidth="1.6" />
       {!asleep && !ghosts && <path d={`M80 ${GROUND - 40} q40 -8 92 0 l0 18 l-92 0Z`} fill="#3b82f6" stroke={INK} strokeWidth="1.6" />}
 
+      {party && <Balloons x={334} base={GROUND - 54} t={gestureT} />}
+
       {/* Mesa */}
       <rect x="244" y={GROUND - 54} width="96" height="8" rx="2" fill="#a16207" stroke={INK} strokeWidth="1.6" />
       <rect x="286" y={GROUND - 46} width="9" height="46" fill="#854d0e" stroke={INK} strokeWidth="1.6" />
       <ellipse cx="300" cy={GROUND - 57} rx="11" ry="3" fill="#f8fafc" stroke={INK} strokeWidth="1.6" />
       <rect x="318" y={GROUND - 66} width="8" height="11" rx="1.5" fill="#f87171" stroke={INK} strokeWidth="1.6" />
-      {birthday && (
+      {party && (
         <g transform={`translate(272 ${GROUND - 56})`}>
           <rect x="-12" y="-12" width="24" height="12" rx="2" fill="#fbcfe8" stroke={INK} strokeWidth="1.6" />
           <rect x="-12" y="-12" width="24" height="3" fill="#f472b6" />
@@ -662,6 +668,9 @@ function Home({ props }: { props: EarthSceneProps }) {
         );
       })()}
 
+      {/* Cumpleaños: guirnalda colgada de lado a lado, delante de la biblioteca (por debajo de los paneles) */}
+      {party && <Bunting x0={262} x1={580} y={112} t={gestureT} text={`¡FELIZ CUMPLE ${Math.floor(age)}!`} />}
+
       {/* Martín */}
       {ghosts ? (
         <>
@@ -699,9 +708,10 @@ function Home({ props }: { props: EarthSceneProps }) {
       ) : null}
       {act?.pose === "guitar" && !ghosts && !asleep && <MusicNotes x={px + 26} y={GROUND - 64} t={gestureT} skill={guitar.skill} />}
       {/* Visita de la familia: un adulto y, cuando Martín ya es abuelo, nietos corriendo */}
-      {act?.label === "Visita de la familia" && !ghosts && (
+      {(act?.label === "Visita de la familia" || (party && !asleep)) && !ghosts && (
         <>
-          <Person x={520} y={GROUND} age={Math.max(28, age - 30)} pose="wave" t={gestureT + 2} facing={-1} color="#be185d" />
+          <Person x={520} y={GROUND} age={Math.max(28, age - 30)} pose="wave" t={gestureT + 2} facing={-1} color="#be185d" mood={party ? "joy" : undefined} />
+          {party && <Person x={570} y={GROUND} age={Math.max(30, age - 2)} pose="wave" t={gestureT + 4.5} facing={-1} color="#0e7490" mood="joy" />}
           {age >= 60 &&
             [0, 1].map((k) => {
               const ph = gestureT * (0.35 + k * 0.1) + k * 2;
@@ -723,6 +733,7 @@ function Home({ props }: { props: EarthSceneProps }) {
         />
       )}
       {cat && <Cat years={years} hour={hour} t={gestureT} color={cat.color} old={cat.left < 2.5} martinAtArmchair={act?.place === 0.46 && !act.walkingFrom} asleep={asleep} />}
+      {party && <Confetti t={gestureT} />}
       {/* Robot cuidador del futuro: en primer plano, recorre el piso y acompaña a Martín junto a la cama */}
       {showRobot && (() => {
         const ft = Number.isFinite(props.fastT) ? props.fastT : gestureT;
@@ -766,6 +777,63 @@ function Home({ props }: { props: EarthSceneProps }) {
 }
 
 /** Un familiar llega caminando, se arrodilla a dejar flores, se queda un momento y se va. */
+/** Guirnalda de banderines con un cartel al centro (cumpleaños). */
+export function Bunting({ x0, x1, y, t, text }: { x0: number; x1: number; y: number; t: number; text: string }) {
+  const n = 14;
+  const colors = ["#f43f5e", "#facc15", "#38bdf8", "#a78bfa", "#4ade80", "#fb923c"];
+  const sag = (u: number) => Math.sin(u * Math.PI) * 14 + Math.sin(t * 1.3) * 0.8;
+  const mid = (x0 + x1) / 2;
+  return (
+    <g>
+      <path d={`M${x0} ${y} Q${mid} ${y + 28} ${x1} ${y}`} stroke={INK} strokeWidth="1" fill="none" />
+      {Array.from({ length: n }, (_, i) => {
+        const u = (i + 0.5) / n;
+        const x = x0 + (x1 - x0) * u;
+        const yy = y + sag(u);
+        const sway = Math.sin(t * 2 + i) * 4;
+        return <path key={i} d={`M${x - 8} ${yy} L${x + 8} ${yy} L${x + sway * 0.3} ${yy + 16}Z`} fill={colors[i % colors.length]} stroke={INK} strokeWidth="1.2" />;
+      })}
+      <rect x={mid - 70} y={y + 22} width="140" height="22" rx="5" fill="#fdf2f8" stroke={INK} strokeWidth="1.6" />
+      <text x={mid} y={y + 38} fontSize="12" textAnchor="middle" fontWeight="bold" fill="#be185d">{text}</text>
+    </g>
+  );
+}
+
+/** Racimo de globos atados a `x`; con gravedad suben, en ingravidez (`drift`) flotan para cualquier lado. */
+export function Balloons({ x, base, t, drift = false }: { x: number; base: number; t: number; drift?: boolean }) {
+  const colors = ["#f43f5e", "#38bdf8", "#facc15", "#a78bfa"];
+  return (
+    <g>
+      {colors.map((c, i) => {
+        const bx = x + (i - 1.5) * 12 + Math.sin(t * 0.9 + i) * (drift ? 14 : 3);
+        const by = base - (drift ? 40 + Math.cos(t * 0.7 + i * 2) * 26 : 62 + (i % 2) * 14 + Math.sin(t * 1.2 + i) * 2);
+        return (
+          <g key={c}>
+            <path d={`M${x} ${base} Q${(x + bx) / 2 + Math.sin(t + i) * 4} ${(base + by) / 2} ${bx} ${by + 11}`} stroke="#e2e8f0" strokeWidth="0.8" fill="none" />
+            <ellipse cx={bx} cy={by} rx="8" ry="10" fill={c} stroke={INK} strokeWidth="1.4" />
+            <ellipse cx={bx - 3} cy={by - 4} rx="2" ry="3" fill="#fff" opacity="0.5" />
+            <path d={`M${bx - 2} ${by + 10} h4 l-2 3Z`} fill={c} stroke={INK} strokeWidth="0.8" />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Papel picado que cae (o flota) por toda la escena. */
+export function Confetti({ t, drift = false }: { t: number; drift?: boolean }) {
+  const colors = ["#f43f5e", "#facc15", "#38bdf8", "#a78bfa", "#4ade80"];
+  return (
+    <g pointerEvents="none">
+      {Array.from({ length: 40 }, (_, k) => {
+        const x = (hash(k) * 800 + Math.sin(t * 1.5 + k) * 16) % 800;
+        const y = drift ? 40 + ((hash(k + 5) * 200 + Math.sin(t * 0.5 + k) * 30) % 220) : (hash(k + 5) * 300 + t * (40 + (k % 5) * 10)) % 300;
+        return <rect key={k} x={x} y={y} width="4" height="2.4" fill={colors[k % colors.length]} transform={`rotate(${t * 120 + k * 40} ${x + 2} ${y + 1})`} />;
+      })}
+    </g>
+  );
+}
+
 function Visitor({ gestureT, age, color }: { gestureT: number; age: number; color: string }) {
   const c = gestureT % 12;
   const ease = (v: number) => Math.min(1, Math.max(0, v));
