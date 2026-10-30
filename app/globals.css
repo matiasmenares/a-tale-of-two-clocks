@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-space), system-ui, sans-serif;
+  --font-mono: var(--font-jet), ui-monospace, monospace;
+}
+
+body {
+  color: #e2e8f0;
+  font-family: var(--font-space), system-ui, sans-serif;
+  min-height: 100vh;
+  background:
+    radial-gradient(1px 1px at 12% 18%, #fff8 50%, transparent 51%),
+    radial-gradient(1px 1px at 72% 34%, #fff6 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 38% 72%, #fff9 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 82%, #fff5 50%, transparent 51%),
+    radial-gradient(1px 1px at 55% 12%, #fff7 50%, transparent 51%),
+    radial-gradient(ellipse 60% 40% at 80% 10%, #4c1d9533, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 10% 90%, #0e749033, transparent 70%),
+    #030712;
+  background-size: 220px 220px, 260px 260px, 300px 300px, 240px 240px, 280px 280px, 100% 100%, 100% 100%, auto;
+  background-attachment: fixed;
+}
+
+/* Panel de vidrio con borde luminoso, estilo consola de nave (en "components" para que las utilidades puedan sobrescribirlo). */
+@layer components {
+.glass {
+  border-radius: 1.25rem;
+  background: linear-gradient(160deg, rgb(15 23 42 / 0.78), rgb(2 6 23 / 0.72));
+  border: 1px solid rgb(148 163 184 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 0 0 1px rgb(34 211 238 / 0.04),
+    0 20px 50px -20px rgb(0 0 0 / 0.8);
+  backdrop-filter: blur(14px);
+}
+}
+
+.hud-label {
+  font-family: var(--font-jet), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.glow-cyan {
+  text-shadow: 0 0 12px rgb(34 211 238 / 0.55);
+}
+
+.glow-amber {
+  text-shadow: 0 0 12px rgb(251 146 60 / 0.55);
+}
+
+input[type="range"] {
+  accent-color: #22d3ee;
+}
+
+/* Línea de tiempo arrastrable de la consola central */
+.timeline {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+}
+.timeline::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+.timeline::-moz-range-track {
+  background: transparent;
+}
+.timeline::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  border-radius: 9999px;
+  background: #f8fafc;
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 12px rgb(34 211 238 / 0.9);
+}
+.timeline::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #f8fafc;
+  border: 2px solid #22d3ee;
+  box-shadow: 0 0 12px rgb(34 211 238 / 0.9);
+}
+
+/* Trazo de caricatura en las escenas: uniones y puntas redondeadas, sin picos en las esquinas. */
+.toon :is(path, rect, line, polyline, polygon, ellipse, circle) {
+  stroke-linejoin: round;
+  stroke-miterlimit: 2;
+}
+.toon :is(path, line, polyline) {
+  stroke-linecap: round;
+}
+.toon [stroke-dasharray] {
+  stroke-linecap: butt;
+}
+.toon {
+  shape-rendering: geometricPrecision;
+}
