@@ -6,34 +6,45 @@ import type { Trip } from "./relativity";
 /** En hipersueño el cuerpo envejece un día por cada cien. */
 export const CRYO_RATE = 0.01;
 
-const sleeps = (kind: string, hyper: boolean) => hyper && kind === "cruise";
+/**
+ * Tramos del tiempo propio de la nave [desde, hasta) en que el hipersueño estuvo activado.
+ * Solo cuenta desde que se activa: activarlo a mitad del viaje no rejuvenece lo ya vivido.
+ */
+export type Sleep = readonly (readonly [number, number])[];
+export const NEVER: Sleep = [];
+export const ALWAYS: Sleep = [[0, Infinity]];
 
-/** ¿Está Tomás dentro de la cápsula en el instante τ? */
-export function inCryo(trip: Trip, tau: number, hyper: boolean) {
-  if (!hyper) return false;
-  const p = trip.phases.find((ph) => tau >= ph.tau0 && tau < ph.tau1);
-  return !!p && sleeps(p.kind, hyper);
+/** Tiempo dormido dentro de [a, b): solo en el crucero y dentro de los tramos activados. */
+function asleepWithin(trip: Trip, a: number, b: number, sleep: Sleep) {
+  let total = 0;
+  for (const p of trip.phases) {
+    if (p.kind !== "cruise") continue;
+    for (const [s, e] of sleep) total += Math.max(0, Math.min(b, p.tau1, e) - Math.max(a, p.tau0, s));
+  }
+  return total;
 }
 
-/** Años que envejeció el cuerpo de Tomás hasta el tiempo propio τ (después del viaje, a ritmo normal). */
-export function bioYears(trip: Trip, tau: number, hyper: boolean) {
-  if (!hyper) return tau;
-  let bio = 0;
-  for (const p of trip.phases) {
-    const span = Math.max(0, Math.min(tau, p.tau1) - p.tau0);
-    bio += span * (sleeps(p.kind, hyper) ? CRYO_RATE : 1);
-  }
-  return bio + Math.max(0, tau - trip.totalTau);
+/** ¿Está Tomás dentro de la cápsula en el instante τ? */
+export function inCryo(trip: Trip, tau: number, sleep: Sleep) {
+  if (!sleep.length) return false;
+  const p = trip.phases.find((ph) => tau >= ph.tau0 && tau < ph.tau1);
+  return !!p && p.kind === "cruise" && sleep.some(([s, e]) => tau >= s && tau < e);
+}
+
+/** Años que envejeció el cuerpo de Tomás hasta el tiempo propio τ. */
+export function bioYears(trip: Trip, tau: number, sleep: Sleep) {
+  if (!sleep.length) return tau;
+  return tau - asleepWithin(trip, 0, tau, sleep) * (1 - CRYO_RATE);
 }
 
 /** Tiempo propio en que el cuerpo de Tomás alcanza `bio` años (Infinity si no ocurre durante el viaje). */
-export function tauAtBio(trip: Trip, bio: number, hyper: boolean) {
-  if (bioYears(trip, trip.totalTau, hyper) < bio) return Infinity;
+export function tauAtBio(trip: Trip, bio: number, sleep: Sleep) {
+  if (bioYears(trip, trip.totalTau, sleep) < bio) return Infinity;
   let lo = 0;
   let hi = trip.totalTau;
   for (let k = 0; k < 80; k++) {
     const mid = (lo + hi) / 2;
-    if (bioYears(trip, mid, hyper) < bio) lo = mid;
+    if (bioYears(trip, mid, sleep) < bio) lo = mid;
     else hi = mid;
   }
   return hi;

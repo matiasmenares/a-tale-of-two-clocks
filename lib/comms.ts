@@ -1,7 +1,7 @@
 // Comunicaciones por luz entre la Tierra y la nave, y "datos freak" del viaje.
 // Unidades: años, años luz, c = 1 (salvo donde se indica).
 
-import { bioYears } from "./cryo";
+import { bioYears, NEVER, type Sleep } from "./cryo";
 import { START_AGE } from "./derive";
 import { stateAt, type ShipState, type Trip } from "./relativity";
 
@@ -28,7 +28,7 @@ export interface LightLink {
  * Señal que la Tierra envía ahora (t, x = 0): alcanza a la nave cuando t_n − x_n = t.
  * Mientras la nave acelera alejándose, puede tardar muchísimo (horizonte de Rindler).
  */
-export function earthToShip(trip: Trip, s: ShipState, hyper = false): LightLink {
+export function earthToShip(trip: Trip, s: ShipState, sleep: Sleep = NEVER): LightLink {
   const target = s.t;
   const end = stateAt(trip, trip.totalTau);
   let tauR: number;
@@ -49,7 +49,7 @@ export function earthToShip(trip: Trip, s: ShipState, hyper = false): LightLink 
     tauR = hi;
     tR = stateAt(trip, hi).t;
   }
-  return { waitForReceiver: tauR - s.tau, earthFrameDelay: tR - s.t, receiverAge: START_AGE + bioYears(trip, tauR, hyper) };
+  return { waitForReceiver: tauR - s.tau, earthFrameDelay: tR - s.t, receiverAge: START_AGE + bioYears(trip, tauR, sleep) };
 }
 
 /** Señal que la nave envía ahora desde (t, x): llega a la Tierra en t + x. */

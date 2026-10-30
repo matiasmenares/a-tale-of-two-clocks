@@ -18,8 +18,8 @@ function PhaseHint({ sim, d }: { sim: Sim; d: Derived }) {
         {sim.roundTrip ? "¡Reencuentro! " : `¡Llegada a ${sim.destination.name}! `}Ambos están ahora en reposo relativo, así que <b>los dos están de acuerdo</b>:
         el terrícola vivió <b className="text-sky-300">{formatYears(d.earthProper)}</b> y el astronauta solo{" "}
         <b className="text-orange-300">{formatYears(d.shipProper)}</b>. No hay paradoja: el astronauta es quien cambió de marco (aceleró).
-        {sim.hypersleep && (
-          <> Además durmió en hipersueño: su reloj marcó ese tiempo, pero su cuerpo envejeció solo <b className="text-sky-300">{formatYears(bioYears(sim.trip, d.shipProper, true))}</b>.</>
+        {sim.sleep.length > 0 && bioYears(sim.trip, d.shipProper, sim.sleep) < d.shipProper - 0.01 && (
+          <> Además durmió en hipersueño: su reloj marcó ese tiempo, pero su cuerpo envejeció solo <b className="text-sky-300">{formatYears(bioYears(sim.trip, d.shipProper, sim.sleep))}</b>.</>
         )}
       </>
     );

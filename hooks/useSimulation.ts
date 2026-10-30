@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { tauAtBio } from "@/lib/cryo";
+import { bioYears, NEVER, tauAtBio, type Sleep } from "@/lib/cryo";
 import { START_AGE } from "@/lib/derive";
 import { buildTrip, DESTINATIONS, stateAt, tauFromT, type Destination, type TripParams } from "@/lib/relativity";
 
@@ -35,8 +35,9 @@ export function useSimulation() {
   const [rate, setRate] = useState(0.5); // años del reloj maestro por segundo real
   const [master, setMaster] = useState<Master>("ship");
   const [director, setDirector] = useState(true);
-  /** Tomás duerme en una cápsula criogénica durante el crucero. */
-  const [hypersleep, setHypersleep] = useState(false);
+  /** Tramos en que Tomás durmió en la cápsula criogénica (solo afecta al crucero). */
+  const [sleep, setSleep] = useState<Sleep>(NEVER);
+  const hypersleep = sleep.length > 0 && sleep[sleep.length - 1][1] === Infinity;
   const [stage, setStage] = useState<Stage>("boarding");
   const [cinematicTime, setCinematicTime] = useState(0);
   const cinematicRef = useRef(0);
@@ -81,17 +82,19 @@ export function useSimulation() {
     list.push(trip.totalTau);
     const earthDeath = tauFromT(trip, lifespan - START_AGE);
     if (earthDeath < trip.totalTau) list.push(earthDeath);
-    const shipDeath = tauAtBio(trip, lifespan - START_AGE, hypersleep);
+    const shipDeath = tauAtBio(trip, lifespan - START_AGE, sleep);
     if (shipDeath < trip.totalTau) list.push(shipDeath);
     return list.filter((t) => t > 0);
-  }, [trip, lifespan, hypersleep]);
+  }, [trip, lifespan, sleep]);
 
   // Si cambia el viaje, conservar la fracción recorrida.
   const prevTrip = useRef(trip);
   useEffect(() => {
     const prev = prevTrip.current;
     if (prev !== trip) {
-      setTau((t) => (t / prev.totalTau) * trip.totalTau);
+      const k = trip.totalTau / prev.totalTau;
+      setTau((t) => t * k);
+      setSleep((w) => w.map(([s, e]) => [s * k, e * k] as const));
       prevTrip.current = trip;
     }
   }, [trip]);
@@ -157,11 +160,29 @@ export function useSimulation() {
     return () => clearInterval(id);
   }, [stage, playing]);
 
+  /**
+   * Activa o desactiva el hipersueño desde este instante. Un muerto no puede entrar a la cápsula,
+   * y activarlo no cambia lo que Tomás ya envejeció.
+   */
+  const setHypersleep = useCallback(
+    (on: boolean) => {
+      const now = stage === "flight" || stage === "done" ? tauRef.current : 0;
+      setSleep((w) => {
+        const past = w.filter(([s]) => s < now).map(([s, e]) => [s, Math.min(e, now)] as const);
+        if (!on) return past;
+        if (bioYears(trip, now, w) >= lifespan - START_AGE) return w;
+        return [...past, [now, Infinity] as const];
+      });
+    },
+    [stage, trip, lifespan],
+  );
+
   const launch = useCallback(() => {
     launchedAt.current = performance.now();
     cinematicRef.current = 0;
     tauRef.current = 0;
     setTau(0);
+    setSleep((w) => (w.length && w[w.length - 1][1] === Infinity ? [[0, Infinity]] : NEVER));
     setCinematicTime(0);
     setStage("cinematic");
     setPlaying(true);
@@ -171,6 +192,7 @@ export function useSimulation() {
     cinematicRef.current = 0;
     setPlaying(false);
     setTau(0);
+    setSleep((w) => (w.length && w[w.length - 1][1] === Infinity ? [[0, Infinity]] : NEVER));
     setCinematicTime(0);
     setShipSpeed(0);
     setStage("boarding");
@@ -191,6 +213,7 @@ export function useSimulation() {
     if (performance.now() - launchedAt.current < 1200) return;
     if (stage === "done") {
       setTau(0);
+      setSleep((w) => (w.length && w[w.length - 1][1] === Infinity ? [[0, Infinity]] : NEVER));
       setStage("flight");
       setPlaying(true);
       return;
@@ -210,7 +233,7 @@ export function useSimulation() {
     beta, setBeta, accelG, setAccelG, roundTrip, setRoundTrip,
     stayEnabled, setStayEnabled, stayK, setStayK, stayYears, setStayYears,
     lifespan, setLifespan,
-    rate, setRate, master, setMaster, director, setDirector, hypersleep, setHypersleep,
+    rate, setRate, master, setMaster, director, setDirector, hypersleep, setHypersleep, sleep,
     stage, cinematicTime, playing, launch, reset, seek, togglePlay,
     trip, ship, tau, shipPlayback, earthPlayback,
   };

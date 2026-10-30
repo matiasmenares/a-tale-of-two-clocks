@@ -87,7 +87,7 @@ function Lab({ sim, d }: { sim: Sim; d: Derived }) {
 function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
   const { ship, trip, lifespan } = sim;
   const flying = sim.stage === "flight" || sim.stage === "done";
-  const toShip = earthToShip(trip, ship, sim.hypersleep);
+  const toShip = earthToShip(trip, ship, sim.sleep);
   const toEarth = shipToEarth(ship, d.earthRate);
   const f = freakFacts(trip, ship);
   // Evento de la nave cuya luz llega hoy a la Tierra: salió hace x_e años (tiempo terrestre).
@@ -158,8 +158,8 @@ function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
         />
         <Row
           label="Latidos de Tomás desde el despegue"
-          value={big(heartbeats(bioYears(trip, d.shipProper, sim.hypersleep)))}
-          note={`${big(heartbeats(d.earthProper) - heartbeats(bioYears(trip, d.shipProper, sim.hypersleep)))} menos que Martín${sim.hypersleep ? " (en hipersueño su corazón late 100 veces más lento)" : ""}`}
+          value={big(heartbeats(bioYears(trip, d.shipProper, sim.sleep)))}
+          note={`${big(heartbeats(d.earthProper) - heartbeats(bioYears(trip, d.shipProper, sim.sleep)))} menos que Martín${sim.sleep.length ? " (en hipersueño su corazón late 100 veces más lento)" : ""}`}
         />
       </section>
 

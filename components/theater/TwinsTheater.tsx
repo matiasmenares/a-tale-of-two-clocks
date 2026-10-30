@@ -95,8 +95,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const deathYears = lifespan - START_AGE;
   const earthAge = START_AGE + Math.min(earthYears, deathYears);
   // Con hipersueño el cuerpo de Tomás casi no envejece en el crucero: su edad es biológica, no la del reloj.
-  const shipBio = bioYears(trip, shipYears, sim.hypersleep);
-  const cryo = flying && stage === "flight" && inCryo(trip, shipYears, sim.hypersleep);
+  const shipBio = bioYears(trip, shipYears, sim.sleep);
+  const cryo = flying && stage === "flight" && inCryo(trip, shipYears, sim.sleep);
   const shipAge = START_AGE + Math.min(shipBio, deathYears);
   const earthAlive = earthYears < deathYears;
   const shipAlive = shipBio < deathYears;
@@ -138,7 +138,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const deathNewsArrived = !earthAlive && d.earthSeenFromShip >= deathYears;
   const rindler = flying && ship.alpha > 0 && ship.x > 0.5;
 
-  const toShip = earthToShip(trip, ship, sim.hypersleep);
+  const toShip = earthToShip(trip, ship, sim.sleep);
   const toEarth = shipToEarth(ship, d.earthRate);
   const countdown = stage === "cinematic" ? Math.ceil(CINEMATIC_SECONDS - cinematicTime) : 0;
 
@@ -252,8 +252,11 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             />
             <span className="w-[4.6rem] whitespace-nowrap font-mono text-cyan-200">{formatPlayback(sim.rate)}/s</span>
           </label>
-          <label className={`${chip} cursor-pointer`} title="Hipersueño: Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo envejece 1 día cada 100">
-            <input type="checkbox" checked={sim.hypersleep} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
+          <label
+            className={`${chip} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
+            title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo envejece 1 día cada 100" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
+          >
+            <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
             ❄️ <span className="hidden xl:inline">hipersueño</span>
           </label>
           <label className={`${chip} cursor-pointer`} title="Cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
