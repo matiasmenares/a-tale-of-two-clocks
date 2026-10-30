@@ -34,10 +34,11 @@ function ZoomableMap({ sim, flying }: { sim: Sim; flying: boolean }) {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  const unitsPerPx = () => (224 / shown.zoom) / (box.current?.clientWidth || 1);
+  // El mapa es cuadrado y se ajusta al lado más corto del recuadro.
+  const unitsPerPx = () => (224 / shown.zoom) / Math.min(box.current?.clientWidth || 1, box.current?.clientHeight || 1);
   const btn = "grid h-8 min-w-8 place-items-center rounded-full border border-white/15 bg-slate-900/80 px-2 text-sm text-slate-100 backdrop-blur transition hover:border-cyan-300/60";
   return (
-    <div className="relative mx-auto aspect-square max-w-md">
+    <div className="relative h-[min(62vh,620px)] min-h-[300px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#020617]">
       <div
         ref={box}
         className={`h-full w-full touch-none ${shown.zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -88,8 +89,16 @@ export function MissionMap({ sim }: { sim: Sim }) {
     return { d, t, earthAlive, shipAlive };
   });
 
+  // Destinos agrupados por distancia, de lo más cercano a lo más lejano.
+  const groups = [
+    { title: "Sistema solar", test: (r: (typeof rows)[number]) => r.d.kind === "planet" },
+    { title: "Estrellas cercanas", test: (r: (typeof rows)[number]) => r.d.kind !== "planet" && r.d.distance < 100 },
+    { title: "Nuestra galaxia", test: (r: (typeof rows)[number]) => r.d.distance >= 100 && r.d.distance < 100_000 },
+    { title: "Más allá de la Vía Láctea", test: (r: (typeof rows)[number]) => r.d.distance >= 100_000 },
+  ];
+
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <section className="space-y-5">
       <div>
         <ZoomableMap sim={sim} flying={flying} />
         <p className="mt-2 text-xs text-slate-400">
@@ -99,39 +108,44 @@ export function MissionMap({ sim }: { sim: Sim }) {
         </p>
       </div>
       <div>
-        <div className="hud-label mb-2 text-slate-400">
+        <div className="hud-label mb-3 text-slate-400">
           Destinos · ida y vuelta: {sim.roundTrip ? "sí" : "no"} · esperanza de vida {sim.lifespan} años{sim.hypersleep ? " · con hipersueño" : ""}
         </div>
-        <div className="space-y-1.5">
-          {rows.map(({ d, t, earthAlive, shipAlive }) => {
-            const sel = d.id === sim.destination.id;
-            return (
-              <button
-                key={d.id}
-                onClick={() => sim.setDestination(d)}
-                className={`grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-xl border px-3 py-2 text-left transition ${
-                  sel ? "border-cyan-300/60 bg-cyan-400/10 shadow-[0_0_20px_-8px_rgba(34,211,238,0.9)]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
-                }`}
-              >
-                <div>
-                  <div className="font-medium text-white">
-                    {d.name} <span className="font-mono text-xs text-slate-400">{formatLy(d.distance)}</span>
-                  </div>
-                  <div className="font-mono text-[11px] text-slate-400">
-                    Tierra {formatYears(t.totalT)} · nave {formatYears(t.totalTau)}
-                  </div>
-                </div>
-                <div className="flex gap-1 text-[11px]">
-                  <span className={`rounded-full px-2 py-0.5 ${earthAlive ? "bg-cyan-400/15 text-cyan-200" : "bg-rose-500/15 text-rose-200"}`}>
-                    🌍 {earthAlive ? "vive" : "muere"}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 ${shipAlive ? "bg-amber-400/15 text-amber-200" : "bg-rose-500/15 text-rose-200"}`}>
-                    🧑‍🚀 {shipAlive ? "vive" : "muere"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+        <div className="space-y-4">
+          {groups.map((g) => (
+            <div key={g.title}>
+              <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-300">{g.title}</div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {rows.filter(g.test).map(({ d, t, earthAlive, shipAlive }) => {
+                  const sel = d.id === sim.destination.id;
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => sim.setDestination(d)}
+                      className={`flex h-full flex-col justify-between gap-1.5 rounded-xl border px-3 py-2 text-left transition ${
+                        sel ? "border-cyan-300/60 bg-cyan-400/10 shadow-[0_0_20px_-8px_rgba(34,211,238,0.9)]" : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                      }`}
+                    >
+                      <div>
+                        <div className="font-medium leading-tight text-white">{d.name}</div>
+                        <div className="font-mono text-[11px] text-slate-400">
+                          {formatLy(d.distance)} · Tierra {formatYears(t.totalT)} · nave {formatYears(t.totalTau)}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 text-[11px]">
+                        <span className={`rounded-full px-2 py-0.5 ${earthAlive ? "bg-cyan-400/15 text-cyan-200" : "bg-rose-500/15 text-rose-200"}`}>
+                          🌍 {earthAlive ? "vive" : "muere"}
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 ${shipAlive ? "bg-amber-400/15 text-amber-200" : "bg-rose-500/15 text-rose-200"}`}>
+                          🧑‍🚀 {shipAlive ? "vive" : "muere"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
