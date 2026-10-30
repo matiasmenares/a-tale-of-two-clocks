@@ -23,7 +23,7 @@ export interface Activity {
 export const hourOfDay = (years: number) => (((years * 365.25 + 9 / 24) % 1) + 1) % 1 * 24;
 
 export const EARTH_PLACES = { bed: 0.12, table: 0.36, desk: 0.6, window: 0.84, armchair: 0.46, plant: 0.925, center: 0.5 };
-export const SHIP_PLACES = { bunk: 0.1, table: 0.32, treadmill: 0.52, console: 0.75, window: 0.88, hydro: 0.43, repair: 0.44, gym: 0.45 };
+export const SHIP_PLACES = { bunk: 0.1, table: 0.32, treadmill: 0.52, console: 0.75, window: 0.88, hydro: 0.43, repair: 0.9, gym: 0.45 };
 
 /** Calendario a partir del tiempo propio: el despegue es el 1 de enero a las 9:00 (un martes). */
 export function calendar(years: number) {

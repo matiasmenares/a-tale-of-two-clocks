@@ -546,6 +546,70 @@ function CryoPod({ age, t }: { age: number; t: number }) {
   );
 }
 
+/**
+ * Compuerta de mantenimiento en la pared bajo la ventana. `open` va de 0 (cerrada) a 1 (abierta):
+ * la puerta gira sobre su bisagra izquierda y deja ver el cableado.
+ */
+function MaintenanceHatch({ open, t, sparks }: { open: number; t: number; sparks: boolean }) {
+  const x0 = 644;
+  const y0 = 204;
+  const w = 46;
+  const h = 46;
+  const angle = open * 115 * (Math.PI / 180);
+  const edge = x0 + w * Math.cos(angle);
+  const bulge = Math.sin(angle) * 5; // el borde libre se acerca a la cámara y se ve más alto
+  const shade = Math.round(100 - Math.sin(angle) * 22);
+  return (
+    <g>
+      {/* Marco y hueco con el cableado */}
+      <rect x={x0 - 3} y={y0 - 3} width={w + 6} height={h + 6} rx="4" fill="#334155" stroke={INK} strokeWidth="1.6" />
+      <rect x={x0} y={y0} width={w} height={h} rx="2" fill="#0b1120" />
+      {open > 0 && (
+        <g opacity={Math.min(1, open * 2)}>
+          <path d={`M${x0 + 4} ${y0 + 8} C${x0 + 16} ${y0 + 18} ${x0 + 8} ${y0 + 30} ${x0 + 26} ${y0 + 36} M${x0 + 8} ${y0 + 4} C${x0 + 24} ${y0 + 14} ${x0 + 32} ${y0 + 26} ${x0 + 42} ${y0 + 40}`} stroke="#ef4444" strokeWidth="1.6" fill="none" />
+          <path d={`M${x0 + 4} ${y0 + 24} C${x0 + 16} ${y0 + 28} ${x0 + 26} ${y0 + 18} ${x0 + 42} ${y0 + 26}`} stroke="#22c55e" strokeWidth="1.6" fill="none" />
+          <path d={`M${x0 + 6} ${y0 + 40} h14 v-8 h12`} stroke="#facc15" strokeWidth="1.2" fill="none" />
+          <rect x={x0 + 30} y={y0 + 6} width="10" height="7" rx="1" fill="#1e293b" stroke="#475569" strokeWidth="0.8" />
+          <circle cx={x0 + 35} cy={y0 + 9.5} r="1.3" fill={Math.floor(t * 3) % 2 ? "#ef4444" : "#7f1d1d"} />
+          {sparks && Math.sin(t * 13) > 0.4 && (
+            <g stroke="#fde047" strokeWidth="0.9">
+              {[0, 1, 2, 3].map((k) => {
+                const a = k * 1.6 + t * 4;
+                return <line key={k} x1={x0 + 26} y1={y0 + 36} x2={x0 + 26 + Math.cos(a) * 6} y2={y0 + 36 + Math.sin(a) * 6} />;
+              })}
+            </g>
+          )}
+        </g>
+      )}
+      {/* La puerta: un trapecio que se angosta y se oscurece al girar sobre la bisagra */}
+      <path
+        d={`M${x0} ${y0} L${edge} ${y0 - bulge} L${edge} ${y0 + h + bulge} L${x0} ${y0 + h}Z`}
+        fill={`rgb(${shade},${shade + 16},${shade + 36})`}
+        stroke={INK}
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      {open < 0.35 && (
+        <g opacity={1 - open / 0.35}>
+          {/* Remaches, manija y cartel de advertencia de la puerta cerrada */}
+          {[[5, 5], [w - 5, 5], [5, h - 5], [w - 5, h - 5]].map(([dx, dy]) => (
+            <circle key={`${dx}-${dy}`} cx={x0 + dx * Math.cos(angle)} cy={y0 + dy} r="1.4" fill="#94a3b8" stroke={INK} strokeWidth="0.5" />
+          ))}
+          <rect x={x0 + (w - 9) * Math.cos(angle)} y={y0 + h / 2 - 6} width={4 * Math.cos(angle) + 0.5} height="12" rx="1.5" fill="#cbd5e1" stroke={INK} strokeWidth="0.8" />
+          <g transform={`translate(${x0 + 9 * Math.cos(angle)} ${y0 + 9}) scale(${Math.cos(angle)} 1)`}>
+            <path d="M0 10 L7 0 L14 10Z" fill="#facc15" stroke={INK} strokeWidth="0.8" />
+            <text x="7" y="8.6" fontSize="7" textAnchor="middle" fontWeight="bold" fill={INK}>!</text>
+          </g>
+          <path d={`M${x0 + 6 * Math.cos(angle)} ${y0 + h - 12} h${22 * Math.cos(angle)}`} stroke="#64748b" strokeWidth="1.2" />
+        </g>
+      )}
+      {/* Bisagras */}
+      <rect x={x0 - 2} y={y0 + 6} width="3" height="7" rx="1" fill="#94a3b8" stroke={INK} strokeWidth="0.6" />
+      <rect x={x0 - 2} y={y0 + h - 13} width="3" height="7" rx="1" fill="#94a3b8" stroke={INK} strokeWidth="0.6" />
+    </g>
+  );
+}
+
 /** Objetos sueltos que flotan en ingravidez (motores apagados). */
 function FloatingStuff({ t }: { t: number }) {
   const drift = (k: number, ax: number, ay: number) => [ax + Math.sin(t * 0.21 + k) * 40, ay + Math.cos(t * 0.17 + k * 2) * 18] as const;
@@ -613,15 +677,12 @@ function Cabin({ props }: { props: ShipSceneProps }) {
   return (
     <>
       <CabinBackdrop props={props} />
-      {/* Panel de pared abierto mientras lo repara (bajo el huerto, lejos de la litera) */}
-      {repairing && !props.cryo && (
-        <g>
-          <rect x="300" y="178" width="40" height="48" rx="3" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
-          <path d="M304 188 C316 198 308 208 324 214 M308 184 C322 192 330 206 336 218" stroke="#ef4444" strokeWidth="1.6" fill="none" />
-          <path d="M304 202 C314 206 322 198 336 206" stroke="#22c55e" strokeWidth="1.6" fill="none" />
-          <rect x="282" y="182" width="16" height="40" rx="2" fill="#64748b" stroke={INK} strokeWidth="1.6" transform="rotate(-14 298 182)" />
-        </g>
-      )}
+      {/* Compuerta de mantenimiento bajo la ventana: cerrada, y se abre mientras la repara */}
+      <MaintenanceHatch
+        open={props.cryo || act.label !== "Reparando un panel" ? 0 : Math.max(0, Math.min(1, (hour - 11) / 0.06, (12 - hour) / 0.06))}
+        t={gestureT}
+        sparks={repairing && !timelapse}
+      />
       {/* Luz de crecimiento del huerto cuando lo cuida */}
       {gardening && !props.cryo && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} />}
       {weightless && alive && !timelapse && !props.cryo && <FloatingStuff t={gestureT} />}
