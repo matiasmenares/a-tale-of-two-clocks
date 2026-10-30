@@ -30,14 +30,7 @@ export default function Home() {
     <>
       <TwinsTheater sim={sim} d={d} onOpen={setPanel} />
       <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
-        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="hud-label text-cyan-300">Laboratorio de relatividad · Misión TERRA-1</div>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              La paradoja de los <span className="glow-cyan text-cyan-300">gemelos</span>
-            </h1>
-            <p className="text-sm text-slate-400">Dilatación del tiempo por velocidad, aceleración y gravedad.</p>
-          </div>
+        <header className="flex justify-end">
           <ChapterTabs chapter={sim.chapter} setChapter={sim.setChapter} />
         </header>
         <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
@@ -60,7 +53,7 @@ export default function Home() {
         </Modal>
       )}
       {panel === "data" && (
-        <Modal title="Comunicaciones y datos del viaje" label="En vivo" onClose={close}>
+        <Modal title="Datos del viaje" label="Comunicaciones y misión" onClose={close}>
           <DataPanel sim={sim} d={d} />
         </Modal>
       )}

@@ -6,7 +6,7 @@ import { START_AGE, type Derived } from "@/lib/derive";
 import { formatAge, formatLy, formatYears, fmt } from "@/lib/format";
 import { EARTH_NAME, LAUNCH_YEAR, SHIP_NAME } from "@/lib/life";
 import { stateAt } from "@/lib/relativity";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 const big = (n: number) =>
   !isFinite(n) ? "∞" : n >= 1e6 ? new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 2 }).format(n) : fmt(n, n < 10 ? 2 : 0);
@@ -23,8 +23,50 @@ function Row({ label, value, note }: { label: string; value: ReactNode; note?: R
   );
 }
 
-/** Datos en vivo: comunicaciones por luz desde ambos lados y curiosidades físicas del viaje. */
+type Tab = "live" | "mission";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "live", label: "📡 En vivo" },
+  { id: "mission", label: "🧪 Misión" },
+];
+
+/** Datos del viaje en pestañas: lo que pasa en vivo y la ficha de la misión. */
 export function DataPanel({ sim, d }: { sim: Sim; d: Derived }) {
+  const [tab, setTab] = useState<Tab>("live");
+  return (
+    <div className="space-y-4">
+      <nav className="flex gap-1.5" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            onClick={() => setTab(t.id)}
+            className={`rounded-full border px-3 py-1 text-sm transition ${tab === t.id ? "border-cyan-300 bg-cyan-400/20 text-cyan-100 shadow-[0_0_16px_-4px_rgba(34,211,238,0.9)]" : "border-white/15 text-slate-300 hover:border-white/40"}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      {tab === "live" ? <LiveData sim={sim} d={d} /> : <MissionInfo />}
+    </div>
+  );
+}
+
+function MissionInfo() {
+  return (
+    <div>
+      <div className="hud-label text-cyan-300">Laboratorio de relatividad · Misión TERRA-1</div>
+      <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        La paradoja de los <span className="glow-cyan text-cyan-300">gemelos</span>
+      </h2>
+      <p className="text-sm text-slate-400">Dilatación del tiempo por velocidad, aceleración y gravedad.</p>
+    </div>
+  );
+}
+
+/** Datos en vivo: comunicaciones por luz desde ambos lados y curiosidades físicas del viaje. */
+function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
   const { ship, trip, lifespan } = sim;
   const flying = sim.stage === "flight" || sim.stage === "done";
   const toShip = earthToShip(trip, ship);
