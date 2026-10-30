@@ -1,4 +1,4 @@
-import { activityAt, birthdayGuests, calendar, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
+import { activityAt, birthdayGuests, calendar, weatherAt, type Weather, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
 import { techAt } from "@/lib/tech";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { skyColors, STAR_POINTS } from "./sky";
@@ -40,8 +40,12 @@ export interface EarthSceneProps {
   party?: boolean;
 }
 
-function Sky({ hour, timelapse, ice = 0, id }: { hour: number; timelapse: boolean; ice?: number; id: string }) {
+function Sky({ hour, timelapse, ice = 0, id, weather, t = 0 }: { hour: number; timelapse: boolean; ice?: number; id: string; weather?: Weather; t?: number }) {
   const sky = skyColors(hour, timelapse);
+  // A ritmo rápido los días pasan volando: el cielo queda con un par de nubes genéricas.
+  const w = !timelapse && weather ? weather : { clouds: 0.3, rain: 0, snow: false };
+  const cloudCount = Math.round(2 + w.clouds * 12);
+  const grey = Math.min(1, w.rain * 1.2 + Math.max(0, w.clouds - 0.6));
   const sunX = ((hour - 6) / 12) * W;
   const sunY = 210 - sky.sunElev * 180;
   return (
@@ -66,17 +70,35 @@ function Sky({ hour, timelapse, ice = 0, id }: { hour: number; timelapse: boolea
       ) : (
         sky.sunElev > -0.15 && <circle cx={sunX} cy={sunY} r="46" fill={`url(#${id}-sun)`} />
       )}
-      {!timelapse && sky.night > 0.6 && <circle cx={W - sunX * 0.6} cy={70} r="12" fill="#e2e8f0" opacity={sky.night} />}
-      {[0, 1, 2].map((i) => {
-        const cx = ((i * 290 + hour * 9) % (W + 200)) - 100;
+      {!timelapse && sky.night > 0.6 && w.clouds < 0.8 && <circle cx={W - sunX * 0.6} cy={70} r="12" fill="#e2e8f0" opacity={sky.night} />}
+      {/* Día nublado o de lluvia: el cielo se pone gris */}
+      {grey > 0 && <rect width={W} height="300" fill="#64748b" opacity={grey * 0.55} />}
+      {Array.from({ length: cloudCount }, (_, i) => {
+        // Nubes repartidas por todo el cielo, que avanzan con el viento a lo largo del día.
+        const cx = ((hash(i + 11) * (W + 200) + hour * (9 + (i % 3) * 4)) % (W + 200)) - 100;
+        const cy = 26 + (i % 5) * 20 + hash(i + 2) * 10;
+        const s = (0.8 + hash(i + 5) * 0.7) * (1 + w.rain * 0.5);
+        const shade = Math.round(255 - grey * 110 - (i % 2) * 12);
         return (
-          <g key={i} fill="#fff" opacity={0.75 - sky.night * 0.55}>
-            <ellipse cx={cx} cy={50 + i * 22} rx="38" ry="11" />
-            <ellipse cx={cx + 22} cy={44 + i * 22} rx="24" ry="12" />
-            <ellipse cx={cx - 20} cy={47 + i * 22} rx="20" ry="9" />
+          <g key={i} fill={`rgb(${shade},${shade},${Math.min(255, shade + 6)})`} opacity={(0.85 - sky.night * 0.55) * (0.7 + w.clouds * 0.3)} transform={`translate(${cx} ${cy}) scale(${s})`}>
+            <ellipse cx="0" cy="0" rx="38" ry="11" />
+            <ellipse cx="20" cy="-6" rx="24" ry="12" />
+            <ellipse cx="-18" cy="-3" rx="20" ry="9" />
+            {w.clouds > 0.6 && <ellipse cx="2" cy="6" rx="44" ry="9" opacity="0.8" />}
           </g>
         );
       })}
+      {/* Lluvia o nieve */}
+      {w.rain > 0 &&
+        Array.from({ length: Math.round(90 * w.rain) }, (_, k) => {
+          if (w.snow) {
+            const y = (hash(k + 3) * 300 + t * (18 + (k % 4) * 5)) % 300;
+            return <circle key={k} cx={(hash(k) * W + Math.sin(t + k) * 12 + W) % W} cy={y} r={1.6 + (k % 3) * 0.7} fill="#fff" opacity="0.85" />;
+          }
+          const y = (hash(k + 11) * 320 + t * (260 + (k % 5) * 30)) % 320 - 20;
+          const x = (hash(k) * 840 - y * 0.18 + 840) % 840 - 20;
+          return <line key={k} x1={x} y1={y} x2={x - 2.6} y2={y + 13} stroke="#dbeafe" strokeWidth="1.1" opacity="0.6" />;
+        })}
       {ice > 0 && <rect width={W} height="300" fill="#e0f2fe" opacity={ice * 0.25} />}
     </>
   );
@@ -458,7 +480,7 @@ function Home({ props }: { props: EarthSceneProps }) {
   const showRobot = nearDeath || tech.robot || (tech.level >= 1 && age >= 80);
   const cal = calendar(years);
   const christmas = cal.dayOfYear >= 352;
-  const winter = cal.dayOfYear >= 152 && cal.dayOfYear < 244; // invierno austral
+  const weather = weatherAt(years);
   // Martín tiene perro solo en dos etapas de su vida.
   const pet = dogAt(years);
   const dog =
@@ -487,14 +509,22 @@ function Home({ props }: { props: EarthSceneProps }) {
 
       {/* Ventana: cielo y ciudad reales de ese año */}
       <svg x="596" y="34" width="160" height="128" viewBox="150 0 500 300" preserveAspectRatio="xMidYMid slice">
-        <Sky hour={hour} timelapse={timelapse} id="win" />
+        <Sky hour={hour} timelapse={timelapse} id="win" weather={weather} t={gestureT} />
         <City year={year} base={300} t={gestureT} night={sky.night} />
         <SeasonTree x={540} base={300} scale={2.4} season={season(cal.dayOfYear)} t={gestureT} />
-        {winter &&
-          Array.from({ length: 40 }, (_, k) => (
-            <circle key={k} cx={150 + ((hash(k) * 500 + Math.sin(gestureT + k) * 12) % 500)} cy={(hash(k + 3) * 300 + gestureT * 25) % 300} r="3" fill="#fff" opacity="0.85" />
-          ))}
       </svg>
+      {/* Gotas que resbalan por el vidrio en los días de lluvia */}
+      {!timelapse && weather.rain > 0 && !weather.snow &&
+        Array.from({ length: 10 }, (_, k) => {
+          const f = (gestureT * (0.12 + (k % 4) * 0.05) + hash(k + 30)) % 1;
+          const x = 600 + hash(k + 40) * 152;
+          return (
+            <g key={k} opacity={0.75 * (1 - f * 0.4)}>
+              <path d={`M${x} ${38 + f * 70} v${f * 40}`} stroke="#e0f2fe" strokeWidth="0.8" opacity="0.5" />
+              <ellipse cx={x} cy={38 + f * 110} rx="1.5" ry="2" fill="#e0f2fe" stroke="#94a3b8" strokeWidth="0.4" />
+            </g>
+          );
+        })}
       <rect x="596" y="34" width="160" height="128" fill="none" stroke="#fafaf9" strokeWidth="7" />
       <line x1="676" y1="34" x2="676" y2="162" stroke="#fafaf9" strokeWidth="4" />
       <rect x="592.5" y="30.5" width="167" height="135" fill="none" stroke={INK} strokeWidth="1.4" />
@@ -1228,10 +1258,9 @@ function Grave({ since, deathYears, gestureT, timelapse, extraVisitor }: { since
     { age: 88, color: "#44403c" },
   ];
   const who = visitors[week % visitors.length];
-  // Clima del día: llueve más en invierno (austral) y casi nada en verano.
-  const day = calendar(deathYears + since);
-  const rainChance = { invierno: 0.5, otoño: 0.32, primavera: 0.22, verano: 0.07 }[season(day.dayOfYear)];
-  const rain = !timelapse && hash(day.dayIndex * 7.13) < rainChance ? 0.5 + hash(day.dayIndex + 3) * 0.5 : 0;
+  // El mismo clima del día que en el resto de la Tierra (la nieve la dibuja el cielo).
+  const today = weatherAt(deathYears + since);
+  const rain = !timelapse && !today.snow ? today.rain : 0;
   return (
     <g>
       {/* Día de lluvia: cielo encapotado y nubes oscuras */}
@@ -1681,7 +1710,7 @@ function After({ props }: { props: EarthSceneProps }) {
     return <SolarFate epoch={epoch.key} years={years} gestureT={gestureT} />;
   return (
     <>
-      <Sky hour={hour} timelapse={timelapse} ice={epoch.key === "ice" ? 0.4 : 0} id="after" />
+      <Sky hour={hour} timelapse={timelapse} ice={epoch.key === "ice" ? 0.4 : 0} id="after" weather={epoch.key === "grave" || epoch.key === "future" ? weatherAt(years) : undefined} t={gestureT} />
       {epoch.key === "ice" ? (
         <IceAge years={years} gestureT={gestureT} night={timelapse ? 0.5 : night} />
       ) : epoch.key === "deep" ? (

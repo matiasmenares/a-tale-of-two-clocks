@@ -63,6 +63,32 @@ export function season(dayOfYear: number): Season {
 }
 export const SEASON_ICON: Record<Season, string> = { verano: "☀️", otoño: "🍂", invierno: "❄️", primavera: "🌸" };
 
+const dayNoise = (n: number) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+export interface Weather {
+  /** Nubosidad: 0 despejado, 1 encapotado. */
+  clouds: number;
+  /** Intensidad de la lluvia (0 si no llueve). */
+  rain: number;
+  /** En los días más fríos del invierno la lluvia cae como nieve. */
+  snow: boolean;
+}
+
+/** Clima del día en la ciudad de Martín: llueve más en invierno (austral) y casi nunca en verano. */
+export function weatherAt(years: number): Weather {
+  const { dayIndex, dayOfYear } = calendar(years);
+  const s = season(dayOfYear);
+  const rainChance = { invierno: 0.45, otoño: 0.3, primavera: 0.2, verano: 0.06 }[s];
+  const rainy = dayNoise(dayIndex * 7.13) < rainChance;
+  const rain = rainy ? 0.45 + dayNoise(dayIndex + 3) * 0.55 : 0;
+  const baseClouds = { invierno: 0.55, otoño: 0.45, primavera: 0.35, verano: 0.15 }[s];
+  const clouds = rainy ? 0.85 + rain * 0.15 : Math.min(0.8, baseClouds * (0.3 + dayNoise(dayIndex * 3.7) * 1.4));
+  return { clouds, rain, snow: rainy && s === "invierno" && dayNoise(dayIndex * 1.9) < 0.3 };
+}
+
 /** Horas de práctica acumuladas con el instrumento. */
 export function practiceHours(who: "earth" | "ship", years: number) {
   if (who === "ship") return Math.max(0, years) * 365.25; // 1 h de violín al día

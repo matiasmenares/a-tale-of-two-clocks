@@ -5,7 +5,7 @@ import { CINEMATIC_SECONDS, type Sim } from "@/hooks/useSimulation";
 import { START_AGE, type Derived } from "@/lib/derive";
 import { fmt, formatAge, formatBeta, formatFactor, formatLy, formatPlayback, formatYears } from "@/lib/format";
 import {
-  activityAt, birthdayGuests, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
+  activityAt, birthdayGuests, weatherAt, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
 } from "@/lib/life";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { techAt } from "@/lib/tech";
@@ -250,7 +250,15 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           </div>
           <div className="text-xs text-slate-300 sm:text-sm">
             <span className="font-mono text-cyan-200">{epoch.title}</span>
-            {flying && earthAlive && earthSetting === "home" && <> · {SEASON_ICON[ss]} {ss}</>}
+            {flying && earthAlive && earthSetting === "home" && (
+              <>
+                {" "}· {SEASON_ICON[ss]} {ss}
+                {!earthTimelapse && (() => {
+                  const w = weatherAt(earthYears);
+                  return w.snow ? " · nieva" : w.rain > 0 ? " · llueve" : w.clouds > 0.55 ? " · nublado" : "";
+                })()}
+              </>
+            )}
             {earthAct && flying && earthSetting === "home" && !earthTimelapse && (
               <>
                 {" "}· {earthAct.label}
