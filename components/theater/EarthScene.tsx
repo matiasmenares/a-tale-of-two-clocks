@@ -615,7 +615,7 @@ function Home({ props }: { props: EarthSceneProps }) {
       {/* Lámpara */}
       <line x1="340" y1="0" x2="340" y2="34" stroke="#44403c" strokeWidth="2" />
       <path d="M322 50 L358 50 L350 34 L330 34Z" fill="#fef3c7" stroke={INK} strokeWidth="1.6" />
-      {lamp > 0.4 && <ellipse cx="340" cy="140" rx="140" ry="110" fill="#fde68a" opacity={lamp * 0.13} />}
+      {lamp > 0.4 && <ellipse cx="340" cy="140" rx="140" ry="110" fill="#fde68a" opacity={lamp * 0.13} pointerEvents="none" />}
 
       {/* Cama */}
       <rect x="34" y={GROUND - 76} width="12" height="76" rx="3" fill="#7c4a24" stroke={INK} strokeWidth="1.6" />

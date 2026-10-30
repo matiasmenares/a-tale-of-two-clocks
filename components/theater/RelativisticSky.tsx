@@ -37,6 +37,69 @@ export function blackbody(T: number): [number, number, number] {
   return [c(r), c(g), c(b)];
 }
 
+/**
+ * Gargantúa en la ventana: sombra, anillo de fotones, la parte de atrás del disco curvada por la lente
+ * gravitacional y el disco delantero más brillante del lado que se acerca (Doppler).
+ */
+function drawBlackHole(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, t: number) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-0.07);
+  const glow = ctx.createRadialGradient(0, 0, r, 0, 0, r * 5);
+  glow.addColorStop(0, "rgba(253,230,138,0.45)");
+  glow.addColorStop(0.4, "rgba(245,158,11,0.15)");
+  glow.addColorStop(1, "rgba(245,158,11,0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 5, 0, Math.PI * 2);
+  ctx.fill();
+  const beam = (w: number) => {
+    const g = ctx.createLinearGradient(-w, 0, w, 0);
+    g.addColorStop(0, "rgba(255,247,237,0.2)");
+    g.addColorStop(0.12, "#fefce8");
+    g.addColorStop(0.4, "#fde68a");
+    g.addColorStop(0.62, "#f59e0b");
+    g.addColorStop(0.88, "#9a3412");
+    g.addColorStop(1, "rgba(124,45,18,0.2)");
+    return g;
+  };
+  // Parte de atrás del disco, desviada por arriba (gruesa) y por abajo (fina).
+  ctx.lineCap = "round";
+  ctx.strokeStyle = beam(r * 1.6);
+  ctx.lineWidth = r * 0.42;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.55, r * 1.5, 0, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = r * 0.14;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.3, r * 1.2, 0, 0, Math.PI);
+  ctx.stroke();
+  // Anillo de fotones y sombra.
+  ctx.strokeStyle = "rgba(255,247,237,0.95)";
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.06, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  // Disco delantero casi de canto, con grumos que giran.
+  ctx.fillStyle = beam(r * 4.2);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 4.2, r * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = Math.max(0.6, r * 0.03);
+  ctx.setLineDash([r * 0.9, r * 0.4]);
+  ctx.lineDashOffset = -t * r * 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 3.4, r * 0.09, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
 interface Star {
   theta: number; // ángulo respecto a la dirección de avance (marco en reposo)
   az: number;
@@ -155,19 +218,9 @@ export function RelativisticSky(props: SkyProps) {
       const D0 = eP;
       const near = 1 / Math.max(1e-6, aheadDistance);
       if (blackHole) {
-        const rr = Math.min(h * 0.3, 40);
-        const grad = ctx.createRadialGradient(cx, cy, rr * 0.8, cx, cy, rr * 2.2);
-        grad.addColorStop(0, "rgba(253,186,116,0.9)");
-        grad.addColorStop(0.4, "rgba(234,88,12,0.5)");
-        grad.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#000";
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr, 0, Math.PI * 2);
-        ctx.fill();
+        // Crece a medida que la nave se acerca; en órbita ocupa buena parte de la ventana.
+        const rr = Math.min(R * 0.2, Math.max(4, (R * 0.004) / Math.max(1e-6, aheadDistance)));
+        drawBlackHole(ctx, cx, cy, rr, performance.now() / 1000);
       } else if (aheadKind === "planet" && planet) {
         // El planeta crece en la ventana según su tamaño angular real (diámetro / distancia).
         const ang = planet.diameterKm / 9.4607e12 / Math.max(1e-12, aheadDistance);

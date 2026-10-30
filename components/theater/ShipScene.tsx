@@ -2,6 +2,7 @@ import { activityAt, earthEpoch, hourOfDay, musicSkill, practiceHours, SHIP_NAME
 import type { PhaseKind, PlanetInfo } from "@/lib/relativity";
 import { OUTDOOR_LIGHT, Outdoors } from "./EarthScene";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
+import { Gargantua } from "./Gargantua";
 import { RelativisticSky, type SkyProps } from "./RelativisticSky";
 import { useFocusView } from "./useFocusView";
 
@@ -751,7 +752,7 @@ function Cabin({ props }: { props: ShipSceneProps }) {
         sparks={repairing && !timelapse}
       />
       {/* Luz de crecimiento del huerto cuando lo cuida */}
-      {gardening && !props.cryo && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} />}
+      {gardening && !props.cryo && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} pointerEvents="none" />}
       {weightless && alive && !timelapse && !props.cryo && <FloatingStuff t={gestureT} />}
       {alive && props.cryo ? (
         <CryoPod age={age} t={gestureT} />
@@ -803,8 +804,8 @@ function Cabin({ props }: { props: ShipSceneProps }) {
       {/* Iluminación nocturna de la cabina */}
       {night && (
         <>
-          <rect width={W} height="300" fill="#0b1a4a" opacity="0.4" />
-          <rect x="0" y={GROUND - 2} width={W} height="3" fill="#38bdf8" opacity="0.6" />
+          <rect width={W} height="300" fill="#0b1a4a" opacity="0.4" pointerEvents="none" />
+          <rect x="0" y={GROUND - 2} width={W} height="3" fill="#38bdf8" opacity="0.6" pointerEvents="none" />
         </>
       )}
     </>
@@ -825,12 +826,6 @@ function Miller({ props }: { props: ShipSceneProps }) {
   return (
     <>
       <defs>
-        <radialGradient id="m-glow">
-          <stop offset="0.35" stopColor="#000" />
-          <stop offset="0.42" stopColor="#fde68a" />
-          <stop offset="0.6" stopColor="#f59e0b" stopOpacity="0.5" />
-          <stop offset="1" stopColor="#f59e0b" stopOpacity="0" />
-        </radialGradient>
         <linearGradient id="m-sea" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#64748b" />
           <stop offset="1" stopColor="#1e293b" />
@@ -839,13 +834,8 @@ function Miller({ props }: { props: ShipSceneProps }) {
       <rect width={W} height="300" fill="#0b1020" />
       {Array.from({ length: 40 }, (_, k) => <circle key={k} cx={(k * 173) % 800} cy={(k * 59) % 160} r="0.8" fill="#fff" opacity="0.6" />)}
       {/* Gargantúa: disco de acreción visto de canto y su imagen curvada por la gravedad */}
-      <g transform="translate(470 92)">
-        <circle r="110" fill="url(#m-glow)" />
-        <ellipse rx="190" ry="14" fill="#fde68a" opacity="0.85" />
-        <ellipse rx="190" ry="14" fill="none" stroke="#f59e0b" strokeWidth="3" />
-        <circle r="44" fill="#000" />
-        <path d="M-60 -6 A60 54 0 0 1 60 -6" fill="none" stroke="#fef3c7" strokeWidth="6" opacity="0.9" />
-        <path d="M-58 8 A58 46 0 0 0 58 8" fill="none" stroke="#fde68a" strokeWidth="4" opacity="0.6" />
+      <g transform="translate(470 128) rotate(-4)">
+        <Gargantua r={44} t={gestureT} idp="miller" />
       </g>
       {/* Océano poco profundo hasta las rodillas */}
       <rect y="200" width={W} height="100" fill="url(#m-sea)" />
@@ -1028,7 +1018,7 @@ function Landed({ props }: { props: ShipSceneProps }) {
       <ellipse cx="700" cy="114" rx="90" ry="80" fill="none" stroke="#cbd5e1" strokeWidth="10" />
       <ellipse cx="700" cy="114" rx="96" ry="86" fill="none" stroke={INK} strokeWidth="1.5" />
       {/* La luz de afuera tiñe la cabina */}
-      <rect width={W} height="300" fill={light} opacity={sealed ? 0.12 : 0.1} />
+      <rect width={W} height="300" fill={light} opacity={sealed ? 0.12 : 0.1} pointerEvents="none" />
       {sealed ? (
         <>
           <rect x="40" y="70" width="110" height={GROUND - 70} rx="12" fill="#64748b" stroke={INK} strokeWidth="2" />

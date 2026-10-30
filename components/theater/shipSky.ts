@@ -11,7 +11,8 @@ export function shipSky(sim: Sim): SkyProps {
   const flying = stage === "flight" || stage === "done";
   const D = trip.params.distance;
   const outbound = ship.phase.leg === "ida";
-  const aheadDistance = stage === "done" ? 1e-6 : outbound && ship.phase.kind !== "stay" ? D - ship.x : outbound ? 1 : ship.x;
+  // En órbita del agujero negro está "encima" de él.
+  const aheadDistance = stage === "done" ? 1e-6 : outbound && ship.phase.kind !== "stay" ? D - ship.x : outbound ? 1e-4 : ship.x;
   const farFromGalaxy = D > 30_000 && Math.min(ship.x, D - ship.x) > 30_000;
   return {
     phi: flying && stage !== "done" ? Math.acosh(Math.max(1, ship.gamma)) : 0,
