@@ -4,6 +4,8 @@ import { CHAPTERS, type Chapter, type Sim } from "@/hooks/useSimulation";
 import { formatBeta, formatFactor, formatLy, formatPlayback, formatYears, fmt } from "@/lib/format";
 import { gamma, PHASE_LABEL, tauFromT } from "@/lib/relativity";
 import { schwarzschildRate } from "@/lib/gravity";
+import { bioYears } from "@/lib/cryo";
+import { START_AGE } from "@/lib/derive";
 import type { ReactNode } from "react";
 
 function Slider({
@@ -64,9 +66,32 @@ export function ControlPanel({ sim }: { sim: Sim }) {
   const seekFraction = (f: number) => sim.seek(byEarth ? tauFromT(trip, f * trip.totalT) : f * trip.totalTau);
   const jumps = trip.phases.map((p, i) => ({ p, i })).filter(({ p }) => p.tau1 > p.tau0);
   const reachedBeta = Math.tanh(trip.phi);
+  const shipAlive = START_AGE + bioYears(trip, sim.tau, sim.sleep) < sim.lifespan;
 
   return (
     <section className="space-y-4">
+      {/* En pantallas chicas estos ajustes salen de la consola para no tapar las escenas: aquí siguen a mano. */}
+      <div className="hidden space-y-3 rounded-xl border border-white/10 p-3 max-sm:block [@media(max-height:520px)]:block">
+        <div className="hud-label text-cyan-300">Ajustes rápidos</div>
+        <Slider
+          label="Ritmo"
+          value={Math.log10(sim.rate)}
+          display={`${formatPlayback(sim.rate)}/s`}
+          min={-7.5}
+          max={4}
+          step={0.01}
+          onChange={(v) => sim.setRate(10 ** v)}
+        />
+        <div className="flex flex-wrap gap-2">
+          <Toggle on={sim.roundTrip} onChange={sim.setRoundTrip}>↩ ida y vuelta</Toggle>
+          <Toggle on={sim.director} onChange={sim.setDirector}>🎬 director</Toggle>
+          {shipAlive ? (
+            <Toggle on={sim.hypersleep} onChange={sim.setHypersleep}>❄️ hipersueño</Toggle>
+          ) : (
+            <span className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-slate-500">❄️ hipersueño (Tomás murió)</span>
+          )}
+        </div>
+      </div>
       <div>
         <div className="mb-1 flex justify-between text-xs text-slate-300">
           <span>Progreso del viaje ({byEarth ? "tiempo terrestre" : "tiempo de la nave"})</span>

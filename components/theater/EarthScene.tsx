@@ -2,6 +2,7 @@ import { activityAt, calendar, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, pr
 import { techAt } from "@/lib/tech";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { skyColors, STAR_POINTS } from "./sky";
+import { useFocusView } from "./useFocusView";
 
 const GROUND = 262;
 const W = 800;
@@ -33,6 +34,8 @@ export interface EarthSceneProps {
   earthAlive: boolean;
   /** Recuerdo que trae Tomás de un planeta (una roca). */
   souvenir?: { color: string; from: string };
+  /** Dónde mira la cámara cuando la pantalla es angosta (coordenada x de la escena). */
+  focusX?: number;
 }
 
 function Sky({ hour, timelapse, ice = 0, id }: { hour: number; timelapse: boolean; ice?: number; id: string }) {
@@ -1637,8 +1640,9 @@ function Reunion({ props }: { props: EarthSceneProps }) {
 }
 
 export function EarthScene(props: EarthSceneProps) {
+  const view = useFocusView(props.focusX ?? W / 2);
   return (
-    <svg viewBox="0 0 800 300" preserveAspectRatio="xMidYMax slice" className="toon absolute inset-0 h-full w-full">
+    <svg ref={view.ref} viewBox={view.viewBox} preserveAspectRatio="xMidYMax slice" className="toon absolute inset-0 h-full w-full">
       <defs>
         <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#7dd3fc" stopOpacity="0.5" />

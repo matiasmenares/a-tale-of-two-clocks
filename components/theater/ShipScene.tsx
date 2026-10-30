@@ -3,6 +3,7 @@ import type { PhaseKind, PlanetInfo } from "@/lib/relativity";
 import { OUTDOOR_LIGHT, Outdoors } from "./EarthScene";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { RelativisticSky, type SkyProps } from "./RelativisticSky";
+import { useFocusView } from "./useFocusView";
 
 const GROUND = 262;
 const W = 800;
@@ -38,6 +39,8 @@ export interface ShipSceneProps {
   cryo?: boolean;
   /** Tiempo terrestre y muerte de Martín: para ver por la escotilla la Tierra de esa época al aterrizar. */
   outside?: { years: number; deathYears: number };
+  /** Dónde mira la cámara cuando la pantalla es angosta (coordenada x de la escena). */
+  focusX?: number;
 }
 
 /** Brazo de acceso de la tripulación, en lo alto de la torre, hasta la escotilla de la Ranger. */
@@ -939,11 +942,12 @@ function Landed({ props }: { props: ShipSceneProps }) {
 
 export function ShipScene(props: ShipSceneProps) {
   const { stage, cinematicTime, years, age, gestureT, landed } = props;
+  const view = useFocusView(props.focusX ?? W / 2);
   const launchSeconds = years * 365.25 * 86_400;
   const inCockpit = (stage === "cinematic" && cinematicTime >= 6) || (stage === "flight" && launchSeconds < 3_600);
   const shake = stage === "flight" ? Math.max(0, 3 * (1 - launchSeconds / 600)) : stage === "cinematic" && cinematicTime > 14 ? 1 : 0;
   return (
-    <svg viewBox="0 0 800 300" preserveAspectRatio="xMidYMax slice" className="toon absolute inset-0 h-full w-full">
+    <svg ref={view.ref} viewBox={view.viewBox} preserveAspectRatio="xMidYMax slice" className="toon absolute inset-0 h-full w-full">
       {stage === "boarding" ? (
         <Gantry t={0} age={age} gestureT={gestureT} waiting />
       ) : stage === "cinematic" && cinematicTime < 6 ? (

@@ -71,7 +71,7 @@ function SpeedBadge({ self, other, otherName }: { self: number; other: number; o
 function Hud({ children, className = "", accent }: { children: ReactNode; className?: string; accent?: "cyan" | "amber" }) {
   return (
     <div
-      className={`pointer-events-none absolute overflow-hidden rounded-2xl border border-white/10 bg-[#030712]/60 px-3.5 py-2.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md ${className}`}
+      className={`pointer-events-none absolute overflow-hidden rounded-2xl border border-white/10 bg-[#030712]/60 px-2.5 py-1.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-3.5 sm:py-2.5 ${className}`}
     >
       {accent && (
         <div
@@ -82,6 +82,9 @@ function Hud({ children, className = "", accent }: { children: ReactNode; classN
     </div>
   );
 }
+
+/** Lo que se esconde en pantallas chicas (celular vertical o apaisado) para no tapar las escenas. */
+const SECONDARY = "max-sm:hidden [@media(max-height:520px)]:hidden";
 
 const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee", decel: "#a78bfa", stay: "#f472b6", surface: "#f97316" };
 
@@ -141,6 +144,38 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const rindler = flying && ship.alpha > 0 && ship.x > 0.5;
 
   const toShip = earthToShip(trip, ship, sim.sleep);
+
+  // Hacia dónde mira la cámara en pantallas angostas: el personaje o lo que está pasando.
+  const placeX = (a: { place: number; walkingFrom?: number; walkT?: number }) =>
+    (a.walkingFrom !== undefined ? a.walkingFrom + (a.place - a.walkingFrom) * (a.walkT ?? 0) : a.place) * 800;
+  const earthFocus =
+    earthSetting === "launch"
+      ? stage === "boarding"
+        ? 260
+        : 600
+      : earthSetting === "home"
+        ? earthAct
+          ? earthAct.pose === "walk" && earthAct.walkingFrom === undefined
+            ? 400
+            : placeX(earthAct)
+          : 120
+        : earthSetting === "reunion"
+          ? 430
+          : 400;
+  const shipFocus =
+    stage === "boarding"
+      ? 330
+      : stage === "cinematic"
+        ? cinematicTime < 6
+          ? 300 + (cinematicTime / 6) * 278
+          : 400
+        : reunion
+          ? 200
+          : cryo
+            ? 290
+            : ship.phase.kind === "surface" || ship.phase.kind === "stay" || shipYears * SEC_PER_YEAR < 3_600 || !shipAct
+              ? 400
+              : placeX(shipAct);
   const toEarth = shipToEarth(ship, d.earthRate);
   const countdown = stage === "cinematic" ? Math.ceil(CINEMATIC_SECONDS - cinematicTime) : 0;
 
@@ -148,7 +183,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const chip = "flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1";
 
   return (
-    <section className="relative flex h-[100svh] min-h-[560px] flex-col overflow-hidden bg-black">
+    <section className="relative flex h-[100svh] flex-col overflow-hidden bg-black [@media(min-height:520px)]:min-h-[560px]">
       {/* ── Mitad superior: la Tierra ── */}
       <div className="relative flex-1 overflow-hidden">
         <EarthScene
@@ -168,13 +203,14 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           shipAlive={shipAlive}
           earthAlive={earthAlive}
           souvenir={sim.roundTrip && destination.planet && shipAlive ? { color: destination.planet.rock, from: destination.name } : undefined}
+          focusX={earthFocus}
         />
-        <Hud accent="cyan" className="left-3 top-3 max-w-[min(25rem,calc(100%-1.5rem))]">
+        <Hud accent="cyan" className="left-2 top-2 max-w-[min(25rem,calc(100%-1rem))] sm:left-3 sm:top-3">
           <div className="hud-label text-cyan-300">🌍 {EARTH_NAME} · Tierra</div>
-          <div className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <div className="text-lg font-semibold tracking-tight text-white sm:text-3xl [@media(max-height:520px)]:text-lg">
             {earthAlive ? formatAge(earthAge) : <span className="text-rose-200">Murió a los {lifespan}</span>}
           </div>
-          <div className="text-sm text-slate-300">
+          <div className="text-xs text-slate-300 sm:text-sm">
             <span className="font-mono text-cyan-200">{epoch.title}</span>
             {flying && earthAlive && earthSetting === "home" && <> · {SEASON_ICON[ss]} {ss}</>}
             {earthAct && flying && earthSetting === "home" && !earthTimelapse && (
@@ -186,14 +222,14 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {earthAlive && earthTimelapse && <> · los días pasan volando</>}
           </div>
           {loss && <div className="mt-0.5 text-xs text-rose-300">💔 Está triste: murió {loss.name}. Sus cenizas quedaron en una urna en el estante.</div>}
-          {epoch.note && <div className="mt-0.5 text-xs text-slate-400">{epoch.note}</div>}
+          {epoch.note && <div className={`mt-0.5 text-xs text-slate-400 ${SECONDARY}`}>{epoch.note}</div>}
           {flying && techAt(LAUNCH_YEAR + Math.floor(earthYears)).level > 0 && (
-            <div className="mt-0.5 text-xs text-cyan-300/90">◇ {techAt(LAUNCH_YEAR + Math.floor(earthYears)).name}</div>
+            <div className={`mt-0.5 text-xs text-cyan-300/90 ${SECONDARY}`}>◇ {techAt(LAUNCH_YEAR + Math.floor(earthYears)).name}</div>
           )}
-          {flying && <div className="mt-1.5"><SpeedBadge self={sim.earthPlayback} other={sim.shipPlayback} otherName={SHIP_NAME} /></div>}
+          {flying && <div className={`mt-1.5 ${SECONDARY}`}><SpeedBadge self={sim.earthPlayback} other={sim.shipPlayback} otherName={SHIP_NAME} /></div>}
         </Hud>
         {flying && stage !== "done" && earthAlive && (
-          <Hud className="bottom-3 right-3 hidden max-w-xs text-xs text-slate-300 sm:block">
+          <Hud className={`bottom-3 right-3 hidden max-w-xs text-xs text-slate-300 sm:block ${SECONDARY}`}>
             <div className="hud-label mb-0.5 text-slate-400">Telescopio</div>
             Ve a {SHIP_NAME} con <b className="text-amber-300">{formatAge(START_AGE + d.shipSeenFromEarth)}</b>
             <div className="text-slate-500">la luz tarda: ya está a {formatLy(ship.x)}</div>
@@ -237,11 +273,11 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               ))}
             </select>
           </label>
-          <label className={`${chip} cursor-pointer`}>
+          <label className={`${chip} cursor-pointer ${SECONDARY}`}>
             <input type="checkbox" checked={sim.roundTrip} onChange={(e) => sim.setRoundTrip(e.target.checked)} className="accent-cyan-400" />
             <span className="hidden lg:inline">ida y vuelta</span><span className="lg:hidden">↩</span>
           </label>
-          <label className={chip}>
+          <label className={`${chip} ${SECONDARY}`}>
             <span className="hud-label text-slate-400">Ritmo</span>
             <input
               type="range"
@@ -255,13 +291,13 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             <span className="w-[4.6rem] whitespace-nowrap font-mono text-cyan-200">{formatPlayback(sim.rate)}/s</span>
           </label>
           <label
-            className={`${chip} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
+            className={`${chip} ${SECONDARY} ${shipAlive ? "cursor-pointer" : "cursor-not-allowed opacity-40"}`}
             title={shipAlive ? "Hipersueño: desde ahora Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo casi no envejece (animación suspendida)" : `${SHIP_NAME} murió: ya no puede entrar a la cápsula`}
           >
             <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
             ❄️ <span className="hidden xl:inline">hipersueño</span>
           </label>
-          <label className={`${chip} cursor-pointer`} title="Cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
+          <label className={`${chip} cursor-pointer ${SECONDARY}`} title="Cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
             <input type="checkbox" checked={sim.director} onChange={(e) => sim.setDirector(e.target.checked)} className="accent-cyan-400" />
             🎬 <span className="hidden xl:inline">director</span>
           </label>
@@ -327,15 +363,16 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           sadNews={sadNews && !cryo}
           cryo={cryo}
           outside={{ years: earthYears, deathYears }}
+          focusX={shipFocus}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
         />
-        <Hud accent="amber" className="left-3 top-3 max-w-[min(25rem,calc(100%-1.5rem))]">
+        <Hud accent="amber" className="left-2 top-2 max-w-[min(25rem,calc(100%-1rem))] sm:left-3 sm:top-3">
           <div className="hud-label text-amber-300">🧑‍🚀 {SHIP_NAME} · Nave TERRA-1</div>
-          <div className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          <div className="text-lg font-semibold tracking-tight text-white sm:text-3xl [@media(max-height:520px)]:text-lg">
             {shipAlive ? formatAge(shipAge) : <span className="text-rose-200">Murió a los {lifespan}</span>}
           </div>
-          <div className="text-sm text-slate-300">
+          <div className="text-xs text-slate-300 sm:text-sm">
             <span className="font-mono text-amber-200">
               {reunion
                 ? "De vuelta en la Tierra"
@@ -362,9 +399,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
           </div>
-          {flying && <div className="mt-1.5"><SpeedBadge self={sim.shipPlayback} other={sim.earthPlayback} otherName={EARTH_NAME} /></div>}
+          {flying && <div className={`mt-1.5 ${SECONDARY}`}><SpeedBadge self={sim.shipPlayback} other={sim.earthPlayback} otherName={EARTH_NAME} /></div>}
         </Hud>
-        <Hud className={`bottom-3 left-3 w-36 p-2 ${stage === "done" ? "hidden" : "hidden sm:block"}`}>
+        <Hud className={`bottom-3 left-3 w-36 p-2 ${stage === "done" ? "hidden" : `hidden sm:block ${SECONDARY}`}`}>
           <div className="hud-label mb-1 text-cyan-300">Navegación</div>
           <div className="aspect-square">
             <StarMap trip={trip} ship={ship} destination={destination} flying={flying} compact />
@@ -386,7 +423,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           </div>
         </Hud>
         {flying && !reunion && (
-          <Hud className="bottom-3 right-3 max-w-sm space-y-1 text-xs text-slate-300">
+          <Hud className={`bottom-3 right-3 max-w-sm space-y-1 text-xs text-slate-300 ${SECONDARY}`}>
             <div className="grid grid-cols-3 gap-2 font-mono">
               <div>
                 <div className="hud-label text-slate-500">Fase</div>
@@ -431,9 +468,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
       </div>
 
       {stage === "done" && (
-        <div className="glass absolute inset-x-0 top-3/4 z-20 mx-auto w-[min(34rem,calc(100%-2rem))] -translate-y-1/2 p-5 text-center text-sm text-slate-200">
+        <div className="glass absolute inset-x-0 top-3/4 z-20 mx-auto w-[min(34rem,calc(100%-2rem))] -translate-y-1/2 p-5 text-center text-sm text-slate-200 max-sm:p-3 [@media(max-height:520px)]:top-auto [@media(max-height:520px)]:bottom-2 [@media(max-height:520px)]:translate-y-0 [@media(max-height:520px)]:p-2.5">
           <div className="hud-label mb-1 text-cyan-300">Fin de la misión</div>
-          <div className="mb-2 text-xl font-semibold text-white">
+          <div className="mb-2 text-xl font-semibold text-white max-sm:text-lg [@media(max-height:520px)]:mb-1 [@media(max-height:520px)]:text-base">
             {sim.roundTrip ? `Regreso a la Tierra · año ${fmtYear(LAUNCH_YEAR + Math.floor(d.earthProper))}` : `Llegada a ${destination.name}`}
           </div>
           <div className="grid grid-cols-2 gap-2 text-left">
@@ -446,7 +483,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               {shipAlive ? <b className="text-amber-100">vivo · {formatAge(shipAge)}</b> : <b className="text-rose-300">murió en el viaje a los {lifespan}</b>}
             </div>
           </div>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-slate-400 [@media(max-height:520px)]:hidden">
             En la Tierra pasaron {formatAge(d.earthProper).replace(" y", ",")}; en la nave, {formatAge(d.shipProper).replace(" y", ",")}. Nadie hizo trampa:
             el que viajó (y aceleró) vivió menos tiempo
             {d.earthProper - d.shipProper < 1 / 365.25 && <> — en este viaje, apenas {fmt((d.earthProper - d.shipProper) * 365.25 * 86_400, 1)} segundos</>}.
@@ -454,7 +491,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           {sim.roundTrip && destination.planet && shipAlive && (
             <p className="mt-1 text-sm text-amber-200">🪨 {SHIP_NAME} trajo una roca de {destination.name.split(" (")[0]} para {earthAlive ? EARTH_NAME : "la tumba de su hermano"}.</p>
           )}
-          <button onClick={sim.reset} className="mt-3 rounded-full border border-cyan-300/40 px-4 py-1.5 text-xs text-cyan-100 transition hover:bg-cyan-400/10">
+          <button onClick={sim.reset} className="mt-3 rounded-full [@media(max-height:520px)]:mt-1.5 border border-cyan-300/40 px-4 py-1.5 text-xs text-cyan-100 transition hover:bg-cyan-400/10">
             Probar otro destino
           </button>
         </div>
