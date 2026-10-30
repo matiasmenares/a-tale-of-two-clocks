@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { techAt } from "@/lib/tech";
 import { arrivalTau, earthToShip, shipToEarth } from "@/lib/comms";
+import { bioYears, inCryo } from "@/lib/cryo";
 import { StarMap } from "../StarMap";
 import { EarthScene } from "./EarthScene";
 import { ShipScene } from "./ShipScene";
@@ -93,9 +94,12 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const shipYears = flying ? d.shipProper : 0;
   const deathYears = lifespan - START_AGE;
   const earthAge = START_AGE + Math.min(earthYears, deathYears);
-  const shipAge = START_AGE + Math.min(shipYears, deathYears);
+  // Con hipersueño el cuerpo de Tomás casi no envejece en el crucero: su edad es biológica, no la del reloj.
+  const shipBio = bioYears(trip, shipYears, sim.hypersleep);
+  const cryo = flying && stage === "flight" && inCryo(trip, shipYears, sim.hypersleep);
+  const shipAge = START_AGE + Math.min(shipBio, deathYears);
   const earthAlive = earthYears < deathYears;
-  const shipAlive = shipYears < deathYears;
+  const shipAlive = shipBio < deathYears;
   const earthTimelapse = sim.playing && stage === "flight" && sim.earthPlayback * 365.25 > 1;
   const shipTimelapse = sim.playing && stage === "flight" && sim.shipPlayback * 365.25 > 1;
   const epoch = earthEpoch(earthYears, deathYears);
@@ -134,7 +138,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const deathNewsArrived = !earthAlive && d.earthSeenFromShip >= deathYears;
   const rindler = flying && ship.alpha > 0 && ship.x > 0.5;
 
-  const toShip = earthToShip(trip, ship);
+  const toShip = earthToShip(trip, ship, sim.hypersleep);
   const toEarth = shipToEarth(ship, d.earthRate);
   const countdown = stage === "cinematic" ? Math.ceil(CINEMATIC_SECONDS - cinematicTime) : 0;
 
@@ -248,6 +252,10 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             />
             <span className="w-[4.6rem] whitespace-nowrap font-mono text-cyan-200">{formatPlayback(sim.rate)}/s</span>
           </label>
+          <label className={`${chip} cursor-pointer`} title="Hipersueño: Tomás duerme en una cápsula criogénica durante el crucero y su cuerpo envejece 1 día cada 100">
+            <input type="checkbox" checked={sim.hypersleep} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
+            ❄️ <span className="hidden xl:inline">hipersueño</span>
+          </label>
           <label className={`${chip} cursor-pointer`} title="Cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
             <input type="checkbox" checked={sim.director} onChange={(e) => sim.setDirector(e.target.checked)} className="accent-cyan-400" />
             🎬 <span className="hidden xl:inline">director</span>
@@ -311,7 +319,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           lastMessageAge={Math.min(lifespan, earthSeenAge)}
           planet={destination.planet}
           surfaceDay={surfaceDay}
-          sadNews={sadNews}
+          sadNews={sadNews && !cryo}
+          cryo={cryo}
+          outside={{ years: earthYears, deathYears }}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
         />
@@ -334,13 +344,14 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {destination.miller && ship.phase.kind === "stay" && stage === "flight" && shipAlive && (
               <> · 🌊 En el planeta de Miller: cada hora suya son 7 años de {EARTH_NAME}</>
             )}
-            {!surfaceAct && !(destination.miller && ship.phase.kind === "stay") && shipAct && flying && !reunion && !shipTimelapse && shipYears * SEC_PER_YEAR > 3_600 && (
+            {cryo && shipAlive && <span className="text-sky-200"> · ❄️ En hipersueño: su cuerpo envejece 1 día cada 100</span>}
+            {!cryo && !surfaceAct && !(destination.miller && ship.phase.kind === "stay") && shipAct && flying && !reunion && !shipTimelapse && shipYears * SEC_PER_YEAR > 3_600 && (
               <>
                 {" "}· {ship.phase.kind === "cruise" && shipAct.pose !== "sleep" ? `flotando — ${shipAct.label.toLowerCase()}` : shipAct.label}
                 {shipAct.pose === "violin" && <span className="text-amber-300"> (nivel {violinLevel})</span>}
               </>
             )}
-            {sadNews && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
+            {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
           </div>
           {flying && <div className="mt-1.5"><SpeedBadge self={sim.shipPlayback} other={sim.earthPlayback} otherName={EARTH_NAME} /></div>}

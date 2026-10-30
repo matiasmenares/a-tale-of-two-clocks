@@ -1,11 +1,8 @@
 "use client";
 
-import { ChapterTabs, ControlPanel } from "@/components/ControlPanel";
+import { ControlPanel } from "@/components/ControlPanel";
 import { DataPanel } from "@/components/DataPanel";
-import { GravityWell } from "@/components/GravityWell";
-import { InfoBox } from "@/components/InfoBox";
 import { Modal } from "@/components/Modal";
-import { SpacetimeDiagram } from "@/components/SpacetimeDiagram";
 import { useSimulation } from "@/hooks/useSimulation";
 import { derive } from "@/lib/derive";
 import dynamic from "next/dynamic";
@@ -29,18 +26,6 @@ export default function Home() {
   return (
     <>
       <TwinsTheater sim={sim} d={d} onOpen={setPanel} />
-      <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
-        <header className="flex justify-end">
-          <ChapterTabs chapter={sim.chapter} setChapter={sim.setChapter} />
-        </header>
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-          <InfoBox sim={sim} d={d} />
-          <div className="space-y-4">
-            <SpacetimeDiagram sim={sim} />
-            {sim.ch.gravity && <GravityWell sim={sim} />}
-          </div>
-        </div>
-      </main>
 
       {panel === "map" && (
         <Modal title="¿Dónde está la nave?" label="Mapa de navegación" onClose={close}>
@@ -53,7 +38,7 @@ export default function Home() {
         </Modal>
       )}
       {panel === "data" && (
-        <Modal title="Datos del viaje" label="Comunicaciones y misión" onClose={close}>
+        <Modal title="Datos del viaje" label="Comunicaciones y laboratorio" onClose={close}>
           <DataPanel sim={sim} d={d} />
         </Modal>
       )}

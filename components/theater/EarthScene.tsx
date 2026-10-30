@@ -1095,8 +1095,21 @@ function Grave({ since, deathYears, gestureT, timelapse, extraVisitor }: { since
     { age: 88, color: "#44403c" },
   ];
   const who = visitors[week % visitors.length];
+  // Clima del día: llueve más en invierno (austral) y casi nada en verano.
+  const day = calendar(deathYears + since);
+  const rainChance = { invierno: 0.5, otoño: 0.32, primavera: 0.22, verano: 0.07 }[season(day.dayOfYear)];
+  const rain = !timelapse && hash(day.dayIndex * 7.13) < rainChance ? 0.5 + hash(day.dayIndex + 3) * 0.5 : 0;
   return (
     <g>
+      {/* Día de lluvia: cielo encapotado y nubes oscuras */}
+      {rain > 0 && (
+        <>
+          <rect width={W} height={GROUND} fill="#1e293b" opacity={0.25 + rain * 0.25} />
+          {Array.from({ length: 7 }, (_, k) => (
+            <ellipse key={k} cx={((k * 140 + gestureT * 6) % 960) - 80} cy={18 + (k % 3) * 14} rx={90 + (k % 2) * 30} ry={22 + (k % 3) * 5} fill="#475569" opacity={0.55 + rain * 0.3} />
+          ))}
+        </>
+      )}
       {/* Reja al fondo del cementerio */}
       <g stroke={decay > 0.5 ? "#7c2d12" : "#334155"} strokeWidth="2">
         <line x1="0" y1={GROUND - 62} x2={W} y2={GROUND - 62} />
@@ -1182,6 +1195,33 @@ function Grave({ since, deathYears, gestureT, timelapse, extraVisitor }: { since
       )}
       {!funeral && !timelapse && visitorNow && <Visitor gestureT={gestureT} age={who.age + since} color={who.color} />}
       {extraVisitor}
+      {rain > 0 && (
+        <g pointerEvents="none">
+          {/* Charcos con ondas donde caen las gotas */}
+          {[150, 420, 650].map((cx, k) => (
+            <g key={cx}>
+              <ellipse cx={cx} cy={GROUND + 16 + k * 4} rx={34 + k * 6} ry="4" fill="#94a3b8" opacity="0.35" />
+              {[0, 1].map((j) => {
+                const f = (gestureT * 0.9 + k * 0.3 + j * 0.5) % 1;
+                return <ellipse key={j} cx={cx - 10 + j * 18} cy={GROUND + 16 + k * 4} rx={2 + f * 9} ry={0.6 + f * 1.6} fill="none" stroke="#e2e8f0" strokeWidth="0.7" opacity={1 - f} />;
+              })}
+            </g>
+          ))}
+          {/* Gotas inclinadas por el viento */}
+          {Array.from({ length: Math.round(70 * rain) }, (_, k) => {
+            const speed = 260 + (k % 5) * 30;
+            const y = (hash(k + 11) * 320 + gestureT * speed) % 320 - 20;
+            const x = (hash(k) * 840 - y * 0.18 + 840) % 840 - 20;
+            return <line key={k} x1={x} y1={y} x2={x - 2.6} y2={y + 13} stroke="#cbd5e1" strokeWidth="1" opacity="0.55" />;
+          })}
+          {/* Salpicaduras en el suelo */}
+          {Array.from({ length: 10 }, (_, k) => {
+            const f = (gestureT * 1.7 + hash(k + 40)) % 1;
+            const x = hash(k + 20 + Math.floor(gestureT * 1.7 + hash(k + 40))) * 800;
+            return <path key={k} d={`M${x - 3} ${GROUND + 8 - f * 3} l-2 -3 M${x + 3} ${GROUND + 8 - f * 3} l2 -3`} stroke="#e2e8f0" strokeWidth="0.8" opacity={1 - f} />;
+          })}
+        </g>
+      )}
     </g>
   );
 }
@@ -1253,75 +1293,249 @@ function DeepTime({ years, gestureT, night }: { years: number; gestureT: number;
   );
 }
 
-/** El futuro lejano de la Tierra según la evolución del Sol. */
-function SolarFate({ epoch, years, gestureT }: { epoch: Epoch["key"]; years: number; gestureT: number }) {
+/** El futuro lejano de la Tierra según la evolución del Sol. `idp` evita choques de ids si la escena se dibuja dos veces. */
+function SolarFate({ epoch, years, gestureT, idp = "sf" }: { epoch: Epoch["key"]; years: number; gestureT: number; idp?: string }) {
+  const id = (s: string) => `${idp}-${s}`;
   if (epoch === "warming") {
-    // El Sol algo más brillante; supercontinente seco con vegetación escasa.
+    // Dentro de 100–1000 millones de años el Sol brilla un 10 % más: sabana seca, mesetas y calima.
+    const shimmer = (k: number) => Math.sin(gestureT * 2.4 + k) * 1.5;
     return (
       <>
-        <rect width={W} height="300" fill="#fde68a" />
-        <rect width={W} height="160" fill="#fbbf24" opacity="0.35" />
-        <circle cx="620" cy="70" r="34" fill="#fffbeb" />
-        <circle cx="620" cy="70" r="60" fill="#fef3c7" opacity="0.4" />
-        <path d="M0 200 L120 150 L230 190 L360 140 L470 185 L600 150 L800 190 V262 H0Z" fill="#a8a29e" />
-        <path d={`M0 ${GROUND - 30} Q200 ${GROUND - 50} 400 ${GROUND - 32} T800 ${GROUND - 26} V300 H0Z`} fill="#a3a35a" />
-        {Array.from({ length: 7 }, (_, k) => (
-          <g key={k} transform={`translate(${60 + k * 115} ${GROUND - 26})`}>
-            <path d="M0 0 v-30" stroke="#57534e" strokeWidth="4" />
-            <ellipse cx="0" cy="-34" rx="16" ry="8" fill="#65a30d" stroke={INK} strokeWidth="0.8" />
+        <defs>
+          <linearGradient id={id("sky")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#f59e0b" />
+            <stop offset="0.55" stopColor="#fcd34d" />
+            <stop offset="1" stopColor="#fef3c7" />
+          </linearGradient>
+          <radialGradient id={id("sun")}>
+            <stop offset="0" stopColor="#ffffff" />
+            <stop offset="0.35" stopColor="#fffbeb" />
+            <stop offset="0.6" stopColor="#fde68a" stopOpacity="0.7" />
+            <stop offset="1" stopColor="#fde68a" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id={id("ground")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#c2a35a" />
+            <stop offset="1" stopColor="#8a6a32" />
+          </linearGradient>
+        </defs>
+        <rect width={W} height="300" fill={`url(#${id("sky")})`} />
+        <circle cx="610" cy="66" r="120" fill={`url(#${id("sun")})`} />
+        <circle cx="610" cy="66" r="30" fill="#fffef5" stroke="#fde68a" strokeWidth="2" />
+        {/* Mesetas en tres planos: más pálidas cuanto más lejos (calima) */}
+        <path d="M0 196 L60 196 L72 168 L170 168 L184 196 L330 196 L344 160 L420 160 L436 196 L600 196 L612 176 L700 176 L716 196 L800 196 V262 H0Z" fill="#e7b977" opacity="0.7" />
+        <path d="M0 214 L110 214 L126 182 L250 182 L268 214 L480 214 L500 186 L590 186 L606 214 L800 214 V262 H0Z" fill="#c98b4a" stroke={INK} strokeWidth="1.2" strokeOpacity="0.5" />
+        <path d={`M0 ${GROUND - 28} Q200 ${GROUND - 44} 400 ${GROUND - 30} T800 ${GROUND - 24} V300 H0Z`} fill={`url(#${id("ground")})`} stroke={INK} strokeWidth="1.6" />
+        {/* Pastos secos y suculentas resistentes al calor */}
+        {Array.from({ length: 22 }, (_, k) => {
+          const x = 12 + k * 37 + hash(k) * 14;
+          const y = GROUND - 24 + hash(k + 4) * 30;
+          return <path key={k} d={`M${x} ${y} l-4 -9 M${x} ${y} l0 -11 M${x} ${y} l4 -8`} stroke="#7c5a1f" strokeWidth="1.4" />;
+        })}
+        {[90, 330, 560, 730].map((x, k) => (
+          <g key={x} transform={`translate(${x} ${GROUND - 20 + (k % 2) * 8})`}>
+            <path d="M0 0 v-34 q0 -6 5 -6 q5 0 5 6 v34Z" fill="#4d7c0f" stroke={INK} strokeWidth="1.4" />
+            <path d="M0 -16 h-7 q-4 0 -4 -4 v-10 q0 -3 3 -3 q3 0 3 3 v7 h5" fill="#4d7c0f" stroke={INK} strokeWidth="1.4" />
+            <path d="M10 -22 h6 q4 0 4 -4 v-8 q0 -3 -3 -3 q-3 0 -3 3 v5 h-4" fill="#4d7c0f" stroke={INK} strokeWidth="1.4" />
+            <path d="M5 -36 v30" stroke="#65a30d" strokeWidth="1" opacity="0.7" />
           </g>
+        ))}
+        {/* Calima: el aire caliente ondula sobre el suelo */}
+        {[0, 1, 2].map((k) => (
+          <path key={k} d={`M0 ${200 + k * 14 + shimmer(k)} Q200 ${196 + k * 14 - shimmer(k)} 400 ${200 + k * 14 + shimmer(k)} T800 ${200 + k * 14}`} stroke="#fff7ed" strokeWidth="5" fill="none" opacity="0.18" />
         ))}
       </>
     );
   }
   if (epoch === "boiled") {
-    // Océanos evaporados: desierto agrietado y salinas bajo un Sol enorme.
-    const shimmer = Math.sin(gestureT * 3) * 2;
+    // Más de mil millones de años: los océanos se evaporaron. Lecho marino seco, salinas y ruinas bajo un Sol enorme.
+    const grow = Math.min(1, (years - 1e9) / 3.5e9);
+    const R = 46 + grow * 34;
+    const spin = gestureT * 2;
     return (
       <>
-        <rect width={W} height="300" fill="#fb923c" />
-        <rect width={W} height="120" fill="#fef3c7" opacity="0.3" />
-        <circle cx="560" cy="80" r={52 + Math.min(20, (years - 1e9) / 1.7e8)} fill="#fffbeb" />
-        <circle cx="560" cy="80" r="110" fill="#fde68a" opacity="0.35" />
-        <path d={`M0 200 L140 170 L300 195 L460 160 L640 190 L800 175 V262 H0Z`} fill="#9a3412" />
-        <path d={`M0 ${GROUND - 30} Q200 ${GROUND - 42} 400 ${GROUND - 32} T800 ${GROUND - 28} V300 H0Z`} fill="#c2410c" />
-        <ellipse cx="420" cy={GROUND + 10} rx="200" ry="14" fill="#fef3c7" opacity="0.8" />
-        {Array.from({ length: 16 }, (_, k) => (
-          <path key={k} d={`M${(k * 53) % 800} ${GROUND + 2 + (k % 3) * 9} l14 6 l-6 8 l16 4`} stroke="#7c2d12" strokeWidth="1.2" fill="none" />
+        <defs>
+          <linearGradient id={id("sky")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#7c2d12" />
+            <stop offset="0.45" stopColor="#ea580c" />
+            <stop offset="1" stopColor="#fdba74" />
+          </linearGradient>
+          <radialGradient id={id("sun")}>
+            <stop offset="0" stopColor="#fffbeb" />
+            <stop offset="0.3" stopColor="#fef3c7" />
+            <stop offset="0.55" stopColor="#fdba74" stopOpacity="0.6" />
+            <stop offset="1" stopColor="#fb923c" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id={id("seabed")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#b45309" />
+            <stop offset="1" stopColor="#7c2d12" />
+          </linearGradient>
+          <pattern id={id("cracks")} width="34" height="20" patternUnits="userSpaceOnUse">
+            <path d="M0 10 L8 2 L24 2 L34 10 L24 18 L8 18Z" fill="none" stroke="#a16207" strokeWidth="1" opacity="0.55" />
+          </pattern>
+        </defs>
+        <rect width={W} height="300" fill={`url(#${id("sky")})`} />
+        {/* Sol grande con corona que gira despacio */}
+        <circle cx="560" cy="86" r={R * 3} fill={`url(#${id("sun")})`} />
+        <g transform={`rotate(${spin} 560 86)`} opacity="0.35">
+          {Array.from({ length: 12 }, (_, k) => {
+            const a = (k / 12) * Math.PI * 2;
+            return <path key={k} d={`M${560 + Math.cos(a) * R * 1.1} ${86 + Math.sin(a) * R * 1.1} L${560 + Math.cos(a + 0.06) * R * 1.9} ${86 + Math.sin(a + 0.06) * R * 1.9} L${560 + Math.cos(a + 0.12) * R * 1.1} ${86 + Math.sin(a + 0.12) * R * 1.1}Z`} fill="#fef3c7" />;
+          })}
+        </g>
+        <circle cx="560" cy="86" r={R} fill="#fff7e0" stroke="#fde68a" strokeWidth="3" />
+        {/* Antiguas costas: acantilados en planos con calima */}
+        <path d="M0 176 L90 150 L150 170 L250 132 L330 168 L430 146 L520 174 L640 140 L730 166 L800 150 V262 H0Z" fill="#c2410c" opacity="0.55" />
+        <path d="M0 198 L70 180 L120 194 L200 168 L290 196 L380 178 L470 200 L560 176 L650 198 L740 182 L800 196 V262 H0Z" fill="#9a3412" stroke={INK} strokeWidth="1.2" strokeOpacity="0.5" />
+        {/* Lecho marino seco con salinas de grietas hexagonales */}
+        <path d={`M0 ${GROUND - 30} Q200 ${GROUND - 44} 400 ${GROUND - 32} T800 ${GROUND - 28} V300 H0Z`} fill={`url(#${id("seabed")})`} stroke={INK} strokeWidth="1.6" />
+        <ellipse cx="420" cy={GROUND + 12} rx="260" ry="20" fill="#fef3c7" opacity="0.85" stroke="#fde68a" strokeWidth="1.5" />
+        <ellipse cx="420" cy={GROUND + 12} rx="260" ry="20" fill={`url(#${id("cracks")})`} />
+        {/* Casco de un barco varado y el esqueleto de una cúpula: lo último de la civilización */}
+        <g transform={`translate(130 ${GROUND - 14})`}>
+          <path d="M-46 0 Q-40 -26 0 -28 L46 -24 L54 0Z" fill="#57534e" stroke={INK} strokeWidth="1.6" />
+          <path d="M-30 -22 L-28 0 M-10 -27 L-9 0 M10 -27 L10 0 M30 -25 L31 0" stroke="#292524" strokeWidth="1.4" />
+          <rect x="-6" y="-46" width="5" height="20" fill="#44403c" stroke={INK} strokeWidth="1.2" transform="rotate(12 -3 -26)" />
+        </g>
+        <g transform={`translate(700 ${GROUND - 22})`} fill="none" stroke={INK} strokeWidth="2.4">
+          <path d="M-56 0 A56 46 0 0 1 56 0" stroke="#78716c" strokeWidth="5" strokeDasharray="70 24 40 200" />
+          <path d="M-56 0 A56 46 0 0 1 56 0" strokeDasharray="70 24 40 200" />
+          <path d="M-28 0 Q-30 -36 0 -46 M28 0 Q30 -36 0 -46 M0 0 V-46" stroke="#57534e" strokeWidth="2" />
+        </g>
+        {/* Polvo y calima */}
+        {Array.from({ length: 24 }, (_, k) => {
+          const x = (hash(k) * 800 + gestureT * (10 + (k % 4) * 4)) % 820 - 10;
+          return <circle key={k} cx={x} cy={170 + hash(k + 2) * 100} r={0.8 + (k % 3) * 0.5} fill="#fed7aa" opacity="0.5" />;
+        })}
+        {[0, 1].map((k) => (
+          <path key={k} d={`M0 ${210 + k * 18 + Math.sin(gestureT * 2 + k) * 2} Q400 ${204 + k * 18} 800 ${210 + k * 18}`} stroke="#fff7ed" strokeWidth="6" fill="none" opacity="0.12" />
         ))}
-        <path d={`M120 ${GROUND - 26} a60 50 0 0 1 120 0Z`} fill="#78716c" opacity="0.7" stroke="#44403c" />
-        <path d={`M150 ${GROUND - 26} l10 -30 l14 24`} stroke="#44403c" strokeWidth="2" fill="none" />
-        <rect y="150" width={W} height="40" fill="#fff7ed" opacity={0.08 + shimmer * 0.01} />
       </>
     );
   }
   if (epoch === "redgiant") {
-    // El Sol, gigante roja, ocupa medio cielo; la superficie es lava.
+    // El Sol, gigante roja, ocupa medio cielo: la corteza se derrite y brillan ríos de lava.
+    const pulse = Math.sin(gestureT * 0.5);
     return (
       <>
-        <rect width={W} height="300" fill="#450a0a" />
-        <circle cx="400" cy="40" r="300" fill="#dc2626" />
-        <circle cx="400" cy="40" r="300" fill="#f97316" opacity={0.25 + Math.sin(gestureT * 0.6) * 0.08} />
-        {Array.from({ length: 12 }, (_, k) => (
-          <circle key={k} cx={180 + hash(k) * 440} cy={hash(k + 3) * 220} r={8 + hash(k + 6) * 16} fill="#b91c1c" opacity="0.5" />
-        ))}
-        <path d={`M0 ${GROUND - 24} Q200 ${GROUND - 40} 400 ${GROUND - 26} T800 ${GROUND - 20} V300 H0Z`} fill="#1c1917" />
-        {Array.from({ length: 9 }, (_, k) => (
-          <path key={k} d={`M${k * 95} ${GROUND + 6} q30 ${8 + (k % 3) * 4} 60 0`} stroke="#f97316" strokeWidth={3 + Math.sin(gestureT * 2 + k)} fill="none" opacity="0.9" />
-        ))}
+        <defs>
+          <linearGradient id={id("sky")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#1c0505" />
+            <stop offset="1" stopColor="#7f1d1d" />
+          </linearGradient>
+          <radialGradient id={id("giant")} cx="0.5" cy="0.5" r="0.5">
+            <stop offset="0" stopColor="#fdba74" />
+            <stop offset="0.55" stopColor="#f97316" />
+            <stop offset="0.85" stopColor="#dc2626" />
+            <stop offset="1" stopColor="#7f1d1d" />
+          </radialGradient>
+          <radialGradient id={id("halo")}>
+            <stop offset="0.7" stopColor="#ef4444" stopOpacity="0.5" />
+            <stop offset="1" stopColor="#ef4444" stopOpacity="0" />
+          </radialGradient>
+          <linearGradient id={id("crust")} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#292524" />
+            <stop offset="1" stopColor="#0c0a09" />
+          </linearGradient>
+        </defs>
+        <rect width={W} height="300" fill={`url(#${id("sky")})`} />
+        <circle cx="400" cy="70" r={330 + pulse * 6} fill={`url(#${id("halo")})`} />
+        <circle cx="400" cy="70" r={270 + pulse * 5} fill={`url(#${id("giant")})`} />
+        {/* Granulación: enormes celdas de convección que hierven despacio */}
+        {Array.from({ length: 18 }, (_, k) => {
+          const a = hash(k) * Math.PI * 2;
+          const r = Math.sqrt(hash(k + 7)) * 230;
+          const s = 14 + hash(k + 3) * 26 + Math.sin(gestureT * 0.4 + k) * 4;
+          return <ellipse key={k} cx={400 + Math.cos(a) * r} cy={70 + Math.sin(a) * r * 0.9} rx={s} ry={s * 0.8} fill={k % 3 ? "#fb923c" : "#b91c1c"} opacity="0.3" />;
+        })}
+        {/* Corteza negra en placas con grietas incandescentes */}
+        <path d={`M0 ${GROUND - 34} L120 ${GROUND - 46} L210 ${GROUND - 36} L330 ${GROUND - 52} L460 ${GROUND - 38} L580 ${GROUND - 48} L700 ${GROUND - 36} L800 ${GROUND - 44} V300 H0Z`} fill={`url(#${id("crust")})`} stroke={INK} strokeWidth="1.6" />
+        {Array.from({ length: 8 }, (_, k) => {
+          // Grietas que se ramifican entre las placas de roca.
+          const x = 30 + k * 100 + hash(k) * 30;
+          const y = GROUND - 34 + (k % 2) * 6;
+          const d = `M${x} ${y} C${x + 12} ${y + 10} ${x - 8} ${y + 22} ${x + 6} ${y + 34} S${x + 30} ${y + 50} ${x + 24} ${y + 62} M${x + 2} ${y + 24} C${x - 14} ${y + 30} ${x - 24} ${y + 34} ${x - 34} ${y + 44}`;
+          const glow = 0.6 + 0.4 * Math.sin(gestureT * 1.5 + k);
+          return (
+            <g key={k}>
+              <path d={d} stroke="#f97316" strokeWidth="7" fill="none" opacity={0.25 * glow} />
+              <path d={d} stroke="#fde047" strokeWidth="2" fill="none" opacity={glow} />
+            </g>
+          );
+        })}
+        {/* Río de lava en primer plano */}
+        <path d={`M0 ${GROUND + 18} Q200 ${GROUND + 4} 400 ${GROUND + 16} T800 ${GROUND + 10}`} stroke="#ea580c" strokeWidth="16" fill="none" />
+        <path d={`M0 ${GROUND + 18} Q200 ${GROUND + 4} 400 ${GROUND + 16} T800 ${GROUND + 10}`} stroke="#fde047" strokeWidth="4" fill="none" strokeDasharray="30 18" strokeDashoffset={-gestureT * 12} opacity="0.85" />
+        {/* Brasas que suben */}
+        {Array.from({ length: 26 }, (_, k) => {
+          const f = (gestureT * (0.15 + (k % 5) * 0.04) + hash(k)) % 1;
+          return <circle key={k} cx={hash(k + 1) * 800 + Math.sin(gestureT + k) * 8} cy={GROUND + 10 - f * 180} r={1 + (k % 3) * 0.6} fill="#fdba74" opacity={1 - f} />;
+        })}
       </>
     );
   }
-  // Enana blanca: no queda Tierra, solo la nebulosa planetaria alrededor del Sol muerto.
+  // Enana blanca: la Tierra ya no existe. Queda la nebulosa planetaria del Sol muerto, y en el fondo
+  // la galaxia elíptica que formaron la Vía Láctea y Andrómeda.
+  const turn = gestureT * 1.5;
   return (
     <>
+      <defs>
+        <radialGradient id={id("neb")}>
+          <stop offset="0" stopColor="#e0f2fe" stopOpacity="0.9" />
+          <stop offset="0.25" stopColor="#22d3ee" stopOpacity="0.45" />
+          <stop offset="0.6" stopColor="#6366f1" stopOpacity="0.25" />
+          <stop offset="1" stopColor="#020617" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={id("milkdromeda")}>
+          <stop offset="0" stopColor="#fef3c7" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fef3c7" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       <rect width={W} height="300" fill="#020617" />
-      {Array.from({ length: 80 }, (_, k) => <circle key={k} cx={(k * 137) % 800} cy={(k * 53) % 300} r={k % 7 === 0 ? 1.2 : 0.6} fill="#fff" opacity="0.7" />)}
-      <ellipse cx="400" cy="150" rx="220" ry="120" fill="#22d3ee" opacity="0.12" />
-      <ellipse cx="400" cy="150" rx="160" ry="90" fill="none" stroke="#a78bfa" strokeWidth="18" opacity="0.25" />
-      <ellipse cx="400" cy="150" rx="120" ry="140" fill="none" stroke="#f472b6" strokeWidth="10" opacity="0.18" transform="rotate(30 400 150)" />
-      <circle cx="400" cy="150" r="5" fill="#fff" />
-      <circle cx="400" cy="150" r="14" fill="#e0f2fe" opacity="0.35" />
+      <ellipse cx="170" cy="90" rx="150" ry="60" fill={`url(#${id("milkdromeda")})`} transform="rotate(-18 170 90)" />
+      {Array.from({ length: 120 }, (_, k) => (
+        <circle key={k} cx={hash(k) * 800} cy={hash(k + 50) * 300} r={k % 9 === 0 ? 1.3 : 0.6} fill={k % 7 === 0 ? "#fde68a" : "#fff"} opacity={0.4 + hash(k + 9) * 0.5} />
+      ))}
+      <g transform={`rotate(${turn} 470 150)`}>
+        <ellipse cx="470" cy="150" rx="210" ry="130" fill={`url(#${id("neb")})`} />
+        <ellipse cx="470" cy="150" rx="150" ry="80" fill="none" stroke="#a78bfa" strokeWidth="22" opacity="0.28" />
+        <ellipse cx="470" cy="150" rx="150" ry="80" fill="none" stroke="#f0abfc" strokeWidth="4" opacity="0.4" />
+        <ellipse cx="470" cy="150" rx="90" ry="160" fill="none" stroke="#f472b6" strokeWidth="12" opacity="0.2" transform="rotate(35 470 150)" />
+        {Array.from({ length: 14 }, (_, k) => {
+          const a = (k / 14) * Math.PI * 2;
+          return <path key={k} d={`M${470 + Math.cos(a) * 60} ${150 + Math.sin(a) * 40} Q${470 + Math.cos(a + 0.3) * 140} ${150 + Math.sin(a + 0.3) * 90} ${470 + Math.cos(a) * 190} ${150 + Math.sin(a) * 120}`} stroke="#67e8f9" strokeWidth="1.2" fill="none" opacity="0.3" />;
+        })}
+      </g>
+      <circle cx="470" cy="150" r="18" fill="#e0f2fe" opacity="0.4" />
+      <circle cx="470" cy="150" r="5" fill="#fff" />
+    </>
+  );
+}
+
+/** Luz que entra por la escotilla de la nave según la época de la Tierra. */
+export const OUTDOOR_LIGHT: Record<Epoch["key"], string> = {
+  life: "#fde68a", grave: "#fde68a", future: "#fde68a", ice: "#e0f2fe", deep: "#c4b5fd",
+  warming: "#fcd34d", boiled: "#fb923c", redgiant: "#ef4444", whitedwarf: "#a5b4fc",
+};
+
+/** El paisaje de la Tierra en este momento, sin personas: lo que se ve al abrir la escotilla de la nave. */
+export function Outdoors({ years, deathYears, gestureT, idp }: { years: number; deathYears: number; gestureT: number; idp: string }) {
+  const epoch = earthEpoch(years, deathYears);
+  if (epoch.key === "warming" || epoch.key === "boiled" || epoch.key === "redgiant" || epoch.key === "whitedwarf")
+    return <SolarFate epoch={epoch.key} years={years} gestureT={gestureT} idp={idp} />;
+  return (
+    <>
+      {/* Misma hora que la escena del reencuentro: atardecer junto a la tumba, mediodía en los demás casos */}
+      <Sky hour={years > deathYears && years - deathYears <= 300 ? 17 : 12} timelapse={false} ice={epoch.key === "ice" ? 0.4 : 0} id={idp} />
+      {epoch.key === "ice" ? (
+        <IceAge years={years} gestureT={gestureT} night={0} />
+      ) : epoch.key === "deep" ? (
+        <DeepTime years={years} gestureT={gestureT} night={0} />
+      ) : (
+        <>
+          <City year={LAUNCH_YEAR + years} base={GROUND - 40} t={gestureT} night={0} />
+          <path d={`M0 ${GROUND - 30} Q200 ${GROUND - 55} 400 ${GROUND - 34} T800 ${GROUND - 26} V300 H0Z`} fill="#4d6b35" />
+        </>
+      )}
     </>
   );
 }
@@ -1362,7 +1576,7 @@ function Reunion({ props }: { props: EarthSceneProps }) {
             {shipAlive ? <Person x={520} y={GROUND} age={shipAge} pose="lookUp" t={gestureT} outfit="flightsuit" facing={-1} mood="sad" /> : null}
           </>
         )}
-        <text x="400" y="40" fontSize="12" textAnchor="middle" fill="#f8fafc" stroke="#020617" strokeWidth="3" paintOrder="stroke">
+        <text x="560" y={GROUND - 70} fontSize="12" textAnchor="middle" fill="#f8fafc" stroke="#020617" strokeWidth="3" paintOrder="stroke">
           {earthEpoch(years, deathYears).key === "whitedwarf"
             ? "No queda Tierra a la que volver: el Sol es una enana blanca"
             : earthEpoch(years, deathYears).key === "redgiant"

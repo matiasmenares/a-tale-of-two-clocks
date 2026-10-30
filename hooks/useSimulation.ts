@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { tauAtBio } from "@/lib/cryo";
 import { START_AGE } from "@/lib/derive";
 import { buildTrip, DESTINATIONS, stateAt, tauFromT, type Destination, type TripParams } from "@/lib/relativity";
 
@@ -34,6 +35,8 @@ export function useSimulation() {
   const [rate, setRate] = useState(0.5); // años del reloj maestro por segundo real
   const [master, setMaster] = useState<Master>("ship");
   const [director, setDirector] = useState(true);
+  /** Tomás duerme en una cápsula criogénica durante el crucero. */
+  const [hypersleep, setHypersleep] = useState(false);
   const [stage, setStage] = useState<Stage>("boarding");
   const [cinematicTime, setCinematicTime] = useState(0);
   const cinematicRef = useRef(0);
@@ -78,9 +81,10 @@ export function useSimulation() {
     list.push(trip.totalTau);
     const earthDeath = tauFromT(trip, lifespan - START_AGE);
     if (earthDeath < trip.totalTau) list.push(earthDeath);
-    if (lifespan - START_AGE < trip.totalTau) list.push(lifespan - START_AGE);
+    const shipDeath = tauAtBio(trip, lifespan - START_AGE, hypersleep);
+    if (shipDeath < trip.totalTau) list.push(shipDeath);
     return list.filter((t) => t > 0);
-  }, [trip, lifespan]);
+  }, [trip, lifespan, hypersleep]);
 
   // Si cambia el viaje, conservar la fracción recorrida.
   const prevTrip = useRef(trip);
@@ -206,7 +210,7 @@ export function useSimulation() {
     beta, setBeta, accelG, setAccelG, roundTrip, setRoundTrip,
     stayEnabled, setStayEnabled, stayK, setStayK, stayYears, setStayYears,
     lifespan, setLifespan,
-    rate, setRate, master, setMaster, director, setDirector,
+    rate, setRate, master, setMaster, director, setDirector, hypersleep, setHypersleep,
     stage, cinematicTime, playing, launch, reset, seek, togglePlay,
     trip, ship, tau, shipPlayback, earthPlayback,
   };

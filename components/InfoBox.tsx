@@ -1,6 +1,7 @@
 "use client";
 
 import type { Sim } from "@/hooks/useSimulation";
+import { bioYears } from "@/lib/cryo";
 import { breakdown, START_AGE, type Derived } from "@/lib/derive";
 import { formatFactor, formatLy, formatYears, fmt } from "@/lib/format";
 import { G_LY_YR2 } from "@/lib/relativity";
@@ -17,6 +18,9 @@ function PhaseHint({ sim, d }: { sim: Sim; d: Derived }) {
         {sim.roundTrip ? "¡Reencuentro! " : `¡Llegada a ${sim.destination.name}! `}Ambos están ahora en reposo relativo, así que <b>los dos están de acuerdo</b>:
         el terrícola vivió <b className="text-sky-300">{formatYears(d.earthProper)}</b> y el astronauta solo{" "}
         <b className="text-orange-300">{formatYears(d.shipProper)}</b>. No hay paradoja: el astronauta es quien cambió de marco (aceleró).
+        {sim.hypersleep && (
+          <> Además durmió en hipersueño: su reloj marcó ese tiempo, pero su cuerpo envejeció solo <b className="text-sky-300">{formatYears(bioYears(sim.trip, d.shipProper, true))}</b>.</>
+        )}
       </>
     );
   switch (ship.phase.kind) {

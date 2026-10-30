@@ -1,6 +1,7 @@
 "use client";
 
 import type { Sim } from "@/hooks/useSimulation";
+import { bioYears } from "@/lib/cryo";
 import { START_AGE } from "@/lib/derive";
 import { formatLy, formatYears } from "@/lib/format";
 import { buildTrip, DESTINATIONS } from "@/lib/relativity";
@@ -12,7 +13,7 @@ export function MissionMap({ sim }: { sim: Sim }) {
   const rows = DESTINATIONS.map((d) => {
     const t = buildTrip({ ...sim.trip.params, distance: d.distance, surfaceDays: d.planet?.surfaceDays ?? 0 });
     const earthAlive = START_AGE + t.totalT < sim.lifespan;
-    const shipAlive = START_AGE + t.totalTau < sim.lifespan;
+    const shipAlive = START_AGE + bioYears(t, t.totalTau, sim.hypersleep) < sim.lifespan;
     return { d, t, earthAlive, shipAlive };
   });
 
@@ -30,7 +31,7 @@ export function MissionMap({ sim }: { sim: Sim }) {
       </div>
       <div>
         <div className="hud-label mb-2 text-slate-400">
-          Destinos · ida y vuelta: {sim.roundTrip ? "sí" : "no"} · esperanza de vida {sim.lifespan} años
+          Destinos · ida y vuelta: {sim.roundTrip ? "sí" : "no"} · esperanza de vida {sim.lifespan} años{sim.hypersleep ? " · con hipersueño" : ""}
         </div>
         <div className="space-y-1.5">
           {rows.map(({ d, t, earthAlive, shipAlive }) => {

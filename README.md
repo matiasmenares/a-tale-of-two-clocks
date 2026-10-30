@@ -31,9 +31,9 @@ npm start
    - La **barra de progreso** se puede arrastrar para saltar a cualquier momento del viaje.
    - **🎬 director** activa una cámara lenta automática en los momentos importantes (despegue, cambios de fase, aterrizajes, muertes) para que no se pasen de largo.
    - **ida y vuelta** decide si Tomás regresa a la Tierra.
+   - **❄️ hipersueño** mete a Tomás en una cápsula criogénica durante el crucero: su reloj sigue marcando el tiempo propio, pero su cuerpo envejece 1 día cada 100, así puede sobrevivir a viajes muy largos.
    - **⚙ Control** permite ajustar la velocidad de crucero, la aceleración, la distancia y la esperanza de vida.
-   - **📊 Datos** muestra las comunicaciones por luz entre los hermanos y "datos freak" del viaje.
-4. Debajo del teatro hay capítulos (velocidad, equivalencia, gravedad, todo junto) con la explicación, las fórmulas y un diagrama espacio‑tiempo en vivo.
+   - **📊 Datos** tiene dos pestañas: **En vivo**, con las comunicaciones por luz entre los hermanos y "datos freak" del viaje, y **Laboratorio**, con los capítulos (velocidad, equivalencia, gravedad, todo junto), la explicación, las fórmulas y un diagrama espacio‑tiempo en vivo.
 
 ## Destinos
 

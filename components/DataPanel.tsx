@@ -1,12 +1,17 @@
 "use client";
 
 import type { Sim } from "@/hooks/useSimulation";
+import { bioYears } from "@/lib/cryo";
 import { earthToShip, freakFacts, heartbeats, RADIO_GHZ, SHIP_MASS_KG, shipToEarth } from "@/lib/comms";
 import { START_AGE, type Derived } from "@/lib/derive";
 import { formatAge, formatLy, formatYears, fmt } from "@/lib/format";
 import { EARTH_NAME, LAUNCH_YEAR, SHIP_NAME } from "@/lib/life";
 import { stateAt } from "@/lib/relativity";
 import { useState, type ReactNode } from "react";
+import { ChapterTabs } from "./ControlPanel";
+import { GravityWell } from "./GravityWell";
+import { InfoBox } from "./InfoBox";
+import { SpacetimeDiagram } from "./SpacetimeDiagram";
 
 const big = (n: number) =>
   !isFinite(n) ? "∞" : n >= 1e6 ? new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 2 }).format(n) : fmt(n, n < 10 ? 2 : 0);
@@ -23,11 +28,11 @@ function Row({ label, value, note }: { label: string; value: ReactNode; note?: R
   );
 }
 
-type Tab = "live" | "mission";
+type Tab = "live" | "lab";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "📡 En vivo" },
-  { id: "mission", label: "🧪 Misión" },
+  { id: "lab", label: "🧪 Laboratorio" },
 ];
 
 /** Datos del viaje en pestañas: lo que pasa en vivo y la ficha de la misión. */
@@ -48,19 +53,32 @@ export function DataPanel({ sim, d }: { sim: Sim; d: Derived }) {
           </button>
         ))}
       </nav>
-      {tab === "live" ? <LiveData sim={sim} d={d} /> : <MissionInfo />}
+      {tab === "live" ? <LiveData sim={sim} d={d} /> : <Lab sim={sim} d={d} />}
     </div>
   );
 }
 
-function MissionInfo() {
+/** Laboratorio: la explicación por capítulos, el diagrama espacio-tiempo y el pozo gravitatorio. */
+function Lab({ sim, d }: { sim: Sim; d: Derived }) {
   return (
-    <div>
-      <div className="hud-label text-cyan-300">Laboratorio de relatividad · Misión TERRA-1</div>
-      <h2 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-        La paradoja de los <span className="glow-cyan text-cyan-300">gemelos</span>
-      </h2>
-      <p className="text-sm text-slate-400">Dilatación del tiempo por velocidad, aceleración y gravedad.</p>
+    <div className="space-y-4">
+      <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div className="hud-label text-cyan-300">Laboratorio de relatividad · Misión TERRA-1</div>
+          <h3 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            La paradoja de los <span className="glow-cyan text-cyan-300">gemelos</span>
+          </h3>
+          <p className="text-sm text-slate-400">Dilatación del tiempo por velocidad, aceleración y gravedad.</p>
+        </div>
+        <ChapterTabs chapter={sim.chapter} setChapter={sim.setChapter} />
+      </header>
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <InfoBox sim={sim} d={d} />
+        <div className="space-y-4">
+          <SpacetimeDiagram sim={sim} />
+          {sim.ch.gravity && <GravityWell sim={sim} />}
+        </div>
+      </div>
     </div>
   );
 }
@@ -69,7 +87,7 @@ function MissionInfo() {
 function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
   const { ship, trip, lifespan } = sim;
   const flying = sim.stage === "flight" || sim.stage === "done";
-  const toShip = earthToShip(trip, ship);
+  const toShip = earthToShip(trip, ship, sim.hypersleep);
   const toEarth = shipToEarth(ship, d.earthRate);
   const f = freakFacts(trip, ship);
   // Evento de la nave cuya luz llega hoy a la Tierra: salió hace x_e años (tiempo terrestre).
@@ -138,7 +156,11 @@ function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
                 : "demasiado tenue para el ojo (magnitud > 6)"
           }
         />
-        <Row label="Latidos de Tomás desde el despegue" value={big(heartbeats(d.shipProper))} note={`${big(heartbeats(d.earthProper) - heartbeats(d.shipProper))} menos que Martín`} />
+        <Row
+          label="Latidos de Tomás desde el despegue"
+          value={big(heartbeats(bioYears(trip, d.shipProper, sim.hypersleep)))}
+          note={`${big(heartbeats(d.earthProper) - heartbeats(bioYears(trip, d.shipProper, sim.hypersleep)))} menos que Martín${sim.hypersleep ? " (en hipersueño su corazón late 100 veces más lento)" : ""}`}
+        />
       </section>
 
       <section className="lg:col-span-2">

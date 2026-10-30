@@ -1,5 +1,6 @@
-import { activityAt, hourOfDay, musicSkill, practiceHours, SHIP_NAME, SHIP_PLACES, surfaceActivity } from "@/lib/life";
+import { activityAt, earthEpoch, hourOfDay, musicSkill, practiceHours, SHIP_NAME, SHIP_PLACES, surfaceActivity } from "@/lib/life";
 import type { PhaseKind, PlanetInfo } from "@/lib/relativity";
+import { OUTDOOR_LIGHT, Outdoors } from "./EarthScene";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { RelativisticSky, type SkyProps } from "./RelativisticSky";
 
@@ -33,6 +34,10 @@ export interface ShipSceneProps {
   sadNews: boolean;
   /** Visita al planeta de Miller: fracción de la estadía (0–1), o null si no corresponde. */
   millerProgress: number | null;
+  /** Tomás duerme en la cápsula de hipersueño. */
+  cryo?: boolean;
+  /** Tiempo terrestre y muerte de Martín: para ver por la escotilla la Tierra de esa época al aterrizar. */
+  outside?: { years: number; deathYears: number };
 }
 
 /** Brazo de acceso de la tripulación, en lo alto de la torre, hasta la escotilla de la Ranger. */
@@ -411,6 +416,8 @@ function ConsoleScreen({ props }: { props: ShipSceneProps }) {
 
 function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: number }) {
   const { gestureT } = props;
+  // En hipersueño la mesa se pliega y su lugar lo ocupa la cápsula.
+  const folded = !!props.cryo && props.alive;
   return (
     <>
       <defs>
@@ -468,8 +475,8 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       <rect x="22" y={GROUND - 36} width="136" height="36" fill="#475569" stroke={INK} strokeWidth="1.6" />
       <rect x="22" y={GROUND - 100} width="8" height="100" fill="#64748b" stroke={INK} strokeWidth="1.6" />
       {/* Mesa plegable */}
-      <rect x="214" y={GROUND - 54} width="84" height="8" rx="2" fill="#cbd5e1" stroke={INK} strokeWidth="1.6" />
-      <rect x="252" y={GROUND - 46} width="7" height="46" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />
+      {!folded && <rect x="214" y={GROUND - 54} width="84" height="8" rx="2" fill="#cbd5e1" stroke={INK} strokeWidth="1.6" />}
+      {!folded && <rect x="252" y={GROUND - 46} width="7" height="46" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />}
       {/* Cinta de correr con arnés */}
       <rect x="348" y={GROUND - 14} width="96" height="14" rx="4" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
       <path d="M432 248 L444 182" stroke={INK} strokeWidth="7.4" />
@@ -485,13 +492,54 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
         <circle key={i} cx={480 + i * 10} cy={GROUND - 46} r="2.5" fill={["#22c55e", "#ef4444", "#f59e0b"][(i + Math.floor(gestureT)) % 3]} stroke={INK} strokeWidth="0.8" />
       ))}
       {/* Taburetes */}
-      {[0.32 * W - 30, SHIP_PLACES.console * W].map((cx) => (
+      {(folded ? [SHIP_PLACES.console * W] : [0.32 * W - 30, SHIP_PLACES.console * W]).map((cx) => (
         <g key={cx} fill="#64748b" stroke={INK} strokeWidth="0.8">
           <rect x={cx - 13} y={GROUND - 28} width="26" height="5" rx="2" />
           <rect x={cx - 2} y={GROUND - 28} width="4" height="28" />
         </g>
       ))}
     </>
+  );
+}
+
+/** Cápsula de hipersueño sobre la litera: Tomás dormido bajo un vidrio escarchado, con signos vitales muy lentos. */
+function CryoPod({ age, t }: { age: number; t: number }) {
+  // En el centro de la cabina (donde va la mesa plegada), a la vista entre los paneles de información.
+  const x0 = 196;
+  const y0 = GROUND - 84;
+  // Un latido cada ~6 s: el metabolismo casi detenido.
+  const beat = (t / 6) % 1 < 0.05;
+  return (
+    <g>
+      {/* Base con tubos de refrigerante */}
+      <rect x={x0} y={GROUND - 30} width="140" height="30" rx="6" fill="#334155" stroke={INK} strokeWidth="1.6" />
+      {[0, 1, 2].map((i) => (
+        <rect key={i} x={x0 + 14 + i * 40} y={GROUND - 22} width="26" height="5" rx="2.5" fill="#0ea5e9" opacity={0.45 + 0.25 * Math.sin(t * 1.2 + i)} />
+      ))}
+      <Sleeper x={x0 + 12} y={GROUND - 30} length={118} age={age} t={t * 0.15} blanket="#cbd5e1" pillow="#e0f2fe" frail />
+      {/* Cúpula de vidrio con escarcha en los bordes */}
+      <path d={`M${x0 + 4} ${GROUND - 30} Q${x0 + 4} ${y0} ${x0 + 70} ${y0} Q${x0 + 136} ${y0} ${x0 + 136} ${GROUND - 30}Z`} fill="#bae6fd" opacity="0.28" stroke="#e0f2fe" strokeWidth="2" />
+      <path d={`M${x0 + 4} ${GROUND - 30} Q${x0 + 4} ${y0} ${x0 + 70} ${y0} Q${x0 + 136} ${y0} ${x0 + 136} ${GROUND - 30}`} fill="none" stroke={INK} strokeWidth="1.6" />
+      <path d={`M${x0 + 22} ${GROUND - 56} Q${x0 + 30} ${y0 + 8} ${x0 + 60} ${y0 + 6}`} stroke="#fff" strokeWidth="2.4" fill="none" opacity="0.6" />
+      {Array.from({ length: 16 }, (_, i) => {
+        const a = (i / 15) * Math.PI;
+        const cx = x0 + 70 - Math.cos(a) * 64;
+        const cy = GROUND - 30 - Math.sin(a) * 50;
+        return <circle key={i} cx={cx} cy={cy} r={2 + (i % 3)} fill="#f0f9ff" opacity="0.55" />;
+      })}
+      {/* Neblina fría que cae por los costados */}
+      {[0, 1, 2, 3].map((i) => {
+        const k = (t * 0.25 + i / 4) % 1;
+        return <ellipse key={i} cx={x0 + 6 + i * 44 + k * 10} cy={GROUND - 4 + k * 3} rx={10 + k * 12} ry={3 + k * 2} fill="#e0f2fe" opacity={0.35 * (1 - k)} />;
+      })}
+      {/* Panel de signos vitales */}
+      <rect x={x0 + 146} y={GROUND - 74} width="40" height="30" rx="3" fill="#0f172a" stroke={INK} strokeWidth="1.4" />
+      <line x1={x0 + 166} y1={GROUND - 44} x2={x0 + 166} y2={GROUND} stroke="#475569" strokeWidth="3" />
+      <text x={x0 + 150} y={GROUND - 65} fontSize="5" fill="#7dd3fc" fontFamily="monospace">CRIO −5 °C</text>
+      <text x={x0 + 150} y={GROUND - 57} fontSize="5" fill={beat ? "#f87171" : "#86efac"} fontFamily="monospace">♥ 10/min</text>
+      <path d={`M${x0 + 150} ${GROUND - 50} h10 ${beat ? "l2 -5 l2 8 l2 -3" : "h6"} h14`} stroke="#22c55e" strokeWidth="0.9" fill="none" />
+      <text x={x0 + 100} y={GROUND - 88} fontSize="7" fill="#e0f2fe" opacity="0.8">❄ z</text>
+    </g>
   );
 }
 
@@ -563,7 +611,7 @@ function Cabin({ props }: { props: ShipSceneProps }) {
     <>
       <CabinBackdrop props={props} />
       {/* Panel de pared abierto mientras lo repara (bajo el huerto, lejos de la litera) */}
-      {repairing && (
+      {repairing && !props.cryo && (
         <g>
           <rect x="300" y="178" width="40" height="48" rx="3" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
           <path d="M304 188 C316 198 308 208 324 214 M308 184 C322 192 330 206 336 218" stroke="#ef4444" strokeWidth="1.6" fill="none" />
@@ -572,9 +620,11 @@ function Cabin({ props }: { props: ShipSceneProps }) {
         </g>
       )}
       {/* Luz de crecimiento del huerto cuando lo cuida */}
-      {gardening && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} />}
-      {weightless && alive && !timelapse && <FloatingStuff t={gestureT} />}
-      {alive ? (
+      {gardening && !props.cryo && <rect x="300" y="96" width="92" height="40" fill="#e879f9" opacity={0.12 + Math.sin(gestureT * 2) * 0.05} />}
+      {weightless && alive && !timelapse && !props.cryo && <FloatingStuff t={gestureT} />}
+      {alive && props.cryo ? (
+        <CryoPod age={age} t={gestureT} />
+      ) : alive ? (
         timelapse ? (
           <>
             <Sleeper x={32} y={GROUND - 46} length={124} age={age} t={gestureT} blanket="#f97316" pillow="#cbd5e1" opacity={0.35} />
@@ -609,11 +659,11 @@ function Cabin({ props }: { props: ShipSceneProps }) {
           <text x="400" y="140" fontSize="14" textAnchor="middle" fill="#e2e8f0">{SHIP_NAME} ya no está. La nave sigue en piloto automático.</text>
         </g>
       )}
-      {alive && !timelapse && act.pose === "violin" && act.walkingFrom === undefined && (
+      {alive && !props.cryo && !timelapse && act.pose === "violin" && act.walkingFrom === undefined && (
         <MusicNotes x={px - offset + 20} y={(weightless ? floatY : GROUND) - 78} t={gestureT} skill={violin.skill} />
       )}
       {/* La roca que trae de recuerdo, sobre la mesa durante el regreso */}
-      {props.planet && props.leg === "vuelta" && (
+      {props.planet && props.leg === "vuelta" && !props.cryo && (
         <g transform={`translate(270 ${GROUND - 58})`}>
           <path d="M-7 4 L-6 -3 L0 -6 L7 -2 L7 4Z" fill={props.planet.rock} stroke={INK} strokeWidth="0.9" />
           <rect x="-9" y="4" width="18" height="2" fill="#94a3b8" />
@@ -822,15 +872,66 @@ function Surface({ props }: { props: ShipSceneProps }) {
 
 /** De vuelta en la Tierra: la cabina vacía con la escotilla abierta a la luz del día. */
 function Landed({ props }: { props: ShipSceneProps }) {
+  const out = props.outside ?? { years: 0, deathYears: Infinity };
+  const epoch = earthEpoch(out.years, out.deathYears).key;
+  // Con la gigante roja (lava) o sin Tierra (enana blanca) la nave no puede aterrizar: la escotilla queda cerrada.
+  const sealed = epoch === "redgiant" || epoch === "whitedwarf";
+  const light = OUTDOOR_LIGHT[epoch];
+  const view = (
+    <svg x="0" y="0" width="110" height={GROUND - 70} viewBox="560 30 150 240" preserveAspectRatio="xMidYMid slice">
+      <Outdoors years={out.years} deathYears={out.deathYears} gestureT={props.gestureT} idp="hatch" />
+    </svg>
+  );
   return (
     <>
       <CabinBackdrop props={props} lights={0.3} />
-      <rect x="40" y="70" width="110" height={GROUND - 70} rx="12" fill="#bae6fd" stroke={INK} strokeWidth="2" />
-      <rect x="40" y={GROUND - 40} width="110" height="40" fill="#4d6b35" />
-      <path d="M40 70 L20 60 L20 270 L40 262Z" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />
-      <path d={`M40 ${GROUND} L150 ${GROUND} L210 290 L0 290Z`} fill="#fde68a" opacity="0.25" />
-      <text x="430" y="150" fontSize="15" textAnchor="middle" fill="#f8fafc">
-        {props.alive ? `${SHIP_NAME} bajó de la nave: ahora está en la Tierra ↑` : "La nave aterrizó vacía"}
+      {/* Por la ventana redonda también se ve la Tierra de esa época */}
+      <clipPath id="landed-window">
+        <ellipse cx="700" cy="114" rx="86" ry="76" />
+      </clipPath>
+      <g clipPath="url(#landed-window)">
+        <svg x="612" y="36" width="176" height="156" viewBox="380 0 340 300" preserveAspectRatio="xMidYMid slice">
+          <Outdoors years={out.years} deathYears={out.deathYears} gestureT={props.gestureT} idp="window" />
+        </svg>
+      </g>
+      <ellipse cx="700" cy="114" rx="90" ry="80" fill="none" stroke="#cbd5e1" strokeWidth="10" />
+      <ellipse cx="700" cy="114" rx="96" ry="86" fill="none" stroke={INK} strokeWidth="1.5" />
+      {/* La luz de afuera tiñe la cabina */}
+      <rect width={W} height="300" fill={light} opacity={sealed ? 0.12 : 0.1} />
+      {sealed ? (
+        <>
+          <rect x="40" y="70" width="110" height={GROUND - 70} rx="12" fill="#64748b" stroke={INK} strokeWidth="2" />
+          <g transform="translate(40 70)">
+            <clipPath id="porthole">
+              <circle cx="55" cy="60" r="30" />
+            </clipPath>
+            <g clipPath="url(#porthole)">{view}</g>
+            <circle cx="55" cy="60" r="30" fill="none" stroke="#cbd5e1" strokeWidth="6" />
+            <circle cx="55" cy="60" r="33" fill="none" stroke={INK} strokeWidth="1.6" />
+          </g>
+          <path d="M60 200 h70 M60 210 h70" stroke="#475569" strokeWidth="3" />
+        </>
+      ) : (
+        <>
+          <g transform="translate(40 70)">
+            <clipPath id="hatch-open">
+              <rect width="110" height={GROUND - 70} rx="12" />
+            </clipPath>
+            <g clipPath="url(#hatch-open)">{view}</g>
+          </g>
+          <rect x="40" y="70" width="110" height={GROUND - 70} rx="12" fill="none" stroke={INK} strokeWidth="2" />
+          <path d="M40 70 L20 60 L20 270 L40 262Z" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />
+          <path d={`M40 ${GROUND} L150 ${GROUND} L210 290 L0 290Z`} fill={light} opacity="0.3" />
+        </>
+      )}
+      <text x="430" y="150" fontSize="15" textAnchor="middle" fill="#f8fafc" stroke="#020617" strokeWidth="3" paintOrder="stroke">
+        {epoch === "whitedwarf"
+          ? "No hay Tierra a la que bajar: el Sol es una enana blanca"
+          : epoch === "redgiant"
+            ? "La Tierra es lava: la nave no puede aterrizar"
+            : props.alive
+              ? `${SHIP_NAME} bajó de la nave: ahora está en la Tierra ↑`
+              : "La nave aterrizó vacía"}
       </text>
     </>
   );
