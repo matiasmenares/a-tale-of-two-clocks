@@ -42,6 +42,8 @@ export interface EarthSceneProps {
   welcome?: boolean;
   /** Abre la comparación de relojes (clic en el calendario y el reloj de la pared). */
   onOpenClocks?: () => void;
+  /** Abre la vista por el telescopio (clic en el telescopio). */
+  onOpenTelescope?: () => void;
 }
 
 function Sky({ hour, timelapse, ice = 0, id, weather, t = 0 }: { hour: number; timelapse: boolean; ice?: number; id: string; weather?: Weather; t?: number }) {
@@ -659,11 +661,16 @@ function Home({ props }: { props: EarthSceneProps }) {
       />
 
       {/* Telescopio y planta */}
-      <g stroke={INK} strokeWidth="2.5">
-        <line x1="700" y1={GROUND} x2="714" y2={GROUND - 64} />
-        <line x1="730" y1={GROUND} x2="714" y2={GROUND - 64} />
+      <g onClick={props.onOpenTelescope} role="button" aria-label="Mirar la nave por el telescopio" className="cursor-pointer transition hover:brightness-200">
+        <title>Mirar la nave por el telescopio</title>
+        {/* Zona de clic generosa alrededor del telescopio */}
+        <rect x="688" y={GROUND - 96} width="60" height="96" fill="transparent" />
+        <g stroke={INK} strokeWidth="2.5">
+          <line x1="700" y1={GROUND} x2="714" y2={GROUND - 64} />
+          <line x1="730" y1={GROUND} x2="714" y2={GROUND - 64} />
+        </g>
+        <rect x="696" y={GROUND - 74} width="46" height="9" rx="3" fill="#1e293b" stroke={INK} strokeWidth="1.4" transform={`rotate(-30 714 ${GROUND - 68})`} />
       </g>
-      <rect x="696" y={GROUND - 74} width="46" height="9" rx="3" fill="#1e293b" stroke={INK} strokeWidth="1.4" transform={`rotate(-30 714 ${GROUND - 68})`} />
       <path d={`M760 ${GROUND} l-6 -26 l28 0 l-6 26Z`} fill="#c2410c" stroke={INK} strokeWidth="1.6" />
       {[-30, -10, 10, 30].map((r, i) => (
         <ellipse key={i} cx="768" cy={GROUND - 40} rx="5" ry="15" fill="#16a34a" stroke={INK} strokeWidth="0.8" transform={`rotate(${r} 768 ${GROUND - 28})`} />

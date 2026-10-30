@@ -186,7 +186,7 @@ function BirthdayNote({ age }: { age: number }) {
 
 const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee", decel: "#a78bfa", stay: "#f472b6", surface: "#f97316" };
 
-export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data" | "clocks") => void }) {
+export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data" | "clocks" | "telescope") => void }) {
   const { stage, ship, trip, lifespan, destination, cinematicTime } = sim;
   const [copied, setCopied] = useState(false);
   const [sound, setSound] = useState(false);
@@ -377,6 +377,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           souvenir={sim.roundTrip && destination.planet && shipAlive ? { color: destination.planet.rock, from: destination.name } : undefined}
           focusX={earthFocus}
           onOpenClocks={() => onOpen("clocks")}
+          onOpenTelescope={() => onOpen("telescope")}
           party={earthBirthday !== null}
           welcome={welcome}
         />
@@ -425,7 +426,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
         </Hud>
         {flying && stage !== "done" && earthAlive && (
           <Hud className={`bottom-3 right-3 hidden max-w-xs text-xs text-slate-300 sm:block ${SECONDARY}`}>
-            <div className="hud-label mb-0.5 text-slate-400">Telescopio</div>
+            <div className="hud-label mb-0.5 text-slate-400">Telescopio · clic en él para mirar</div>
             Ve a {SHIP_NAME} con <b className="text-amber-300">{formatAge(START_AGE + d.shipSeenFromEarth)}</b>
             <div className="text-slate-500">la luz tarda: ya está a {formatLy(ship.x)}</div>
             <div className="mt-1">
