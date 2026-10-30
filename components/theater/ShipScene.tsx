@@ -41,6 +41,10 @@ export interface ShipSceneProps {
   outside?: { years: number; deathYears: number };
   /** Dónde mira la cámara cuando la pantalla es angosta (coordenada x de la escena). */
   focusX?: number;
+  /** Clic en la pantalla de navegación: abre el mapa. */
+  onOpenMap?: () => void;
+  /** Clic en el reloj de la misión: abre la comparación de relojes. */
+  onOpenClocks?: () => void;
 }
 
 /** Brazo de acceso de la tripulación, en lo alto de la torre, hasta la escotilla de la Ranger. */
@@ -521,10 +525,34 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       <rect x="436" y="176" width="20" height="10" rx="2" fill="#1e293b" stroke={INK} strokeWidth="1.4" />
       {/* Consola de navegación */}
       <rect x="470" y={GROUND - 58} width="96" height="58" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
-      <rect x="478" y={GROUND - 112} width="80" height="48" rx="4" fill="#020617" stroke="#475569" strokeWidth="3" />
-      <g transform={`translate(481 ${GROUND - 109})`}>
-        <ConsoleScreen props={props} />
+      {/* La pantalla de navegación abre el mapa */}
+      <g onClick={props.onOpenMap} role="button" aria-label="Abrir el mapa de navegación" className="cursor-pointer transition hover:brightness-150">
+        <title>Abrir el mapa de navegación</title>
+        <rect x="478" y={GROUND - 112} width="80" height="48" rx="4" fill="#020617" stroke="#475569" strokeWidth="3" />
+        <g transform={`translate(481 ${GROUND - 109})`}>
+          <ConsoleScreen props={props} />
+        </g>
       </g>
+      {/* Reloj de la misión sobre la consola: abre la comparación de relojes */}
+      {(() => {
+        const days = props.years * 365.25 + 9 / 24;
+        const h = (days % 1) * 24;
+        const hh = String(Math.floor(h)).padStart(2, "0");
+        const mm = String(Math.floor((h % 1) * 60)).padStart(2, "0");
+        return (
+          <g onClick={props.onOpenClocks} role="button" aria-label="Comparar los relojes de los dos hermanos" className="cursor-pointer transition hover:brightness-150">
+            <title>Comparar los relojes de Tomás y Martín</title>
+            <rect x="482" y={GROUND - 140} width="72" height="20" rx="4" fill="#0b1120" stroke={INK} strokeWidth="1.6" />
+            <text x="487" y={GROUND - 126} fontSize="7" fill="#94a3b8" fontFamily="monospace">DÍA</text>
+            <text x="503" y={GROUND - 126} fontSize="8" fill="#fbbf24" fontFamily="monospace" fontWeight="bold">
+              {Math.floor(days) + 1}
+            </text>
+            <text x="550" y={GROUND - 126} fontSize="8" fill="#67e8f9" fontFamily="monospace" textAnchor="end">
+              {hh}:{mm}
+            </text>
+          </g>
+        );
+      })()}
       {Array.from({ length: 8 }, (_, i) => (
         <circle key={i} cx={480 + i * 10} cy={GROUND - 46} r="2.5" fill={["#22c55e", "#ef4444", "#f59e0b"][(i + Math.floor(gestureT)) % 3]} stroke={INK} strokeWidth="0.8" />
       ))}

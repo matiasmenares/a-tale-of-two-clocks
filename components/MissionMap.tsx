@@ -5,7 +5,78 @@ import { ALWAYS, bioYears, NEVER } from "@/lib/cryo";
 import { START_AGE } from "@/lib/derive";
 import { formatLy, formatYears } from "@/lib/format";
 import { buildTrip, DESTINATIONS } from "@/lib/relativity";
-import { StarMap } from "./StarMap";
+import { useEffect, useRef, useState } from "react";
+import { shipMapPoint, StarMap, type MapView } from "./StarMap";
+
+const MAX_ZOOM = 60;
+
+/**
+ * Mapa con zoom: rueda o botones para acercar, arrastrar para moverse y «Ir a la nave» para seguirla.
+ */
+function ZoomableMap({ sim, flying }: { sim: Sim; flying: boolean }) {
+  const [view, setView] = useState<MapView>({ x: 0, y: 0, zoom: 1 });
+  const [follow, setFollow] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const shipAt = shipMapPoint(sim.trip, sim.ship, sim.destination, flying);
+  const shown = follow ? { ...view, x: shipAt[0], y: shipAt[1] } : view;
+  const zoomBy = (f: number) => setView((v) => ({ ...v, zoom: Math.min(MAX_ZOOM, Math.max(1, v.zoom * f)) }));
+
+  // La rueda acerca o aleja (hace falta un listener no pasivo para que no se desplace la página).
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1.25 : 0.8);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const unitsPerPx = () => (224 / shown.zoom) / (box.current?.clientWidth || 1);
+  const btn = "grid h-8 min-w-8 place-items-center rounded-full border border-white/15 bg-slate-900/80 px-2 text-sm text-slate-100 backdrop-blur transition hover:border-cyan-300/60";
+  return (
+    <div className="relative mx-auto aspect-square max-w-md">
+      <div
+        ref={box}
+        className={`h-full w-full touch-none ${shown.zoom > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
+        onPointerDown={(e) => {
+          if (shown.zoom === 1) return;
+          setFollow(false);
+          drag.current = { x: e.clientX, y: e.clientY, vx: shown.x, vy: shown.y };
+          (e.target as Element).setPointerCapture?.(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current;
+          if (!d) return;
+          const k = unitsPerPx();
+          setView((v) => ({ ...v, x: d.vx - (e.clientX - d.x) * k, y: d.vy - (e.clientY - d.y) * k }));
+        }}
+        onPointerUp={() => (drag.current = null)}
+      >
+        <StarMap trip={sim.trip} ship={sim.ship} destination={sim.destination} flying={flying} onSelect={sim.setDestination} view={shown} />
+      </div>
+      <div className="absolute right-2 top-2 flex flex-col gap-1.5">
+        <button className={btn} onClick={() => zoomBy(1.6)} aria-label="Acercar" title="Acercar">＋</button>
+        <button className={btn} onClick={() => zoomBy(1 / 1.6)} aria-label="Alejar" title="Alejar">－</button>
+        <button className={btn} onClick={() => { setFollow(false); setView({ x: 0, y: 0, zoom: 1 }); }} aria-label="Ver todo" title="Ver todo">⤢</button>
+      </div>
+      {flying && (
+        <button
+          className={`${btn} absolute bottom-2 left-2 gap-1 px-3 text-xs ${follow ? "border-amber-300/70 text-amber-200" : ""}`}
+          onClick={() => {
+            setFollow(true);
+            setView((v) => ({ ...v, zoom: Math.max(v.zoom, 8) }));
+          }}
+        >
+          🎯 {follow ? "Siguiendo la nave" : "Ir a la nave"}
+        </button>
+      )}
+      {shown.zoom > 1 && <div className="absolute bottom-2 right-2 rounded-full bg-slate-900/80 px-2 py-0.5 font-mono text-[10px] text-slate-400">×{shown.zoom.toFixed(1)}</div>}
+    </div>
+  );
+}
 
 /** Mapa de navegación grande con los destinos clicables y el desenlace previsto de cada viaje. */
 export function MissionMap({ sim }: { sim: Sim }) {
@@ -20,13 +91,11 @@ export function MissionMap({ sim }: { sim: Sim }) {
   return (
     <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <div>
-        <div className="mx-auto aspect-square max-w-md">
-          <StarMap trip={sim.trip} ship={sim.ship} destination={sim.destination} flying={flying} onSelect={sim.setDestination} />
-        </div>
+        <ZoomableMap sim={sim} flying={flying} />
         <p className="mt-2 text-xs text-slate-400">
           {sim.destination.kind === "planet"
             ? "Viaje dentro del sistema solar: a estas velocidades (unos miles de km/s) la dilatación del tiempo es de apenas segundos. El punto ámbar es la nave."
-            : "El Sol está al centro y el centro de la galaxia hacia arriba. Las direcciones son reales (longitud galáctica) y la distancia está en escala logarítmica: cada anillo es 10 veces más lejos. El punto ámbar es la nave. Haz clic en un destino para elegirlo."}
+            : "El Sol está al centro y el centro de la galaxia hacia arriba. Las direcciones son reales (longitud galáctica) y la distancia está en escala logarítmica: cada anillo es 10 veces más lejos. El punto ámbar es la nave. Haz clic en un destino para elegirlo; con la rueda o los botones puedes acercarte y arrastrar el mapa."}
         </p>
       </div>
       <div>

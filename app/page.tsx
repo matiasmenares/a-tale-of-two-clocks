@@ -1,6 +1,7 @@
 "use client";
 
 import { ControlPanel } from "@/components/ControlPanel";
+import { ClocksPanel } from "@/components/ClocksPanel";
 import { DataPanel } from "@/components/DataPanel";
 import { Modal } from "@/components/Modal";
 import { useSimulation } from "@/hooks/useSimulation";
@@ -15,7 +16,7 @@ const TwinsTheater = dynamic(() => import("@/components/theater/TwinsTheater").t
 });
 const MissionMap = dynamic(() => import("@/components/MissionMap").then((m) => m.MissionMap), { ssr: false });
 
-export type Panel = "map" | "control" | "data";
+export type Panel = "map" | "control" | "data" | "clocks";
 
 export default function Home() {
   const sim = useSimulation();
@@ -35,6 +36,11 @@ export default function Home() {
       {panel === "control" && (
         <Modal title="Panel de control" label="Parámetros de la misión" onClose={close}>
           <ControlPanel sim={sim} />
+        </Modal>
+      )}
+      {panel === "clocks" && (
+        <Modal title="Comparar los relojes" label="Tierra y nave" onClose={close}>
+          <ClocksPanel sim={sim} d={d} />
         </Modal>
       )}
       {panel === "data" && (

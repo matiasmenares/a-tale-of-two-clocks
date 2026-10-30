@@ -40,6 +40,8 @@ export interface EarthSceneProps {
   party?: boolean;
   /** Martín ya vio que la nave dio la vuelta: prepara la bienvenida. */
   welcome?: boolean;
+  /** Abre la comparación de relojes (clic en el calendario y el reloj de la pared). */
+  onOpenClocks?: () => void;
 }
 
 function Sky({ hour, timelapse, ice = 0, id, weather, t = 0 }: { hour: number; timelapse: boolean; ice?: number; id: string; weather?: Weather; t?: number }) {
@@ -585,18 +587,28 @@ function Home({ props }: { props: EarthSceneProps }) {
       <path d="M276 82 q9 -12 18 0" fill="#3a2618" stroke={INK} strokeWidth="0.8" />
       <rect x="273" y="95" width="24" height="20" rx="3" fill="#3f5873" stroke={INK} strokeWidth="0.8" />
       <rect x="290" y="99" width="5" height="4" fill="#f97316" />
-      {tech.level === 0 ? (
-        <g>
-          <rect x="488" y="58" width="66" height="58" fill="#f8fafc" stroke={INK} strokeWidth="1.6" />
-          <rect x="488" y="58" width="66" height="15" fill="#dc2626" stroke={INK} strokeWidth="1.6" />
-          <text x="521" y="102" fontSize="17" textAnchor="middle" fill="#0f172a" fontWeight="bold">{year}</text>
-        </g>
-      ) : (
-        <g>
-          <rect x="488" y="62" width="68" height="40" rx="4" fill="#0f172a" stroke="#64748b" strokeWidth="2" />
-          <text x="522" y="88" fontSize="16" textAnchor="middle" fill="#67e8f9" fontWeight="bold">{year}</text>
-        </g>
-      )}
+      {/* Calendario y reloj de pared: un clic abre la comparación con el reloj de Tomás */}
+      <g
+        onClick={props.onOpenClocks}
+        role="button"
+        aria-label="Comparar los relojes de los dos hermanos"
+        className="cursor-pointer transition hover:brightness-125 [&:hover_.clock-ring]:opacity-100"
+      >
+        <title>Comparar los relojes de Martín y Tomás</title>
+        {tech.level === 0 ? (
+          <g>
+            <rect x="488" y="84" width="66" height="54" fill="#f8fafc" stroke={INK} strokeWidth="1.6" />
+            <rect x="488" y="84" width="66" height="14" fill="#dc2626" stroke={INK} strokeWidth="1.6" />
+            <text x="521" y="126" fontSize="17" textAnchor="middle" fill="#0f172a" fontWeight="bold">{year}</text>
+          </g>
+        ) : (
+          <g>
+            <rect x="488" y="94" width="68" height="36" rx="4" fill="#0f172a" stroke="#64748b" strokeWidth="2" />
+            <text x="522" y="118" fontSize="16" textAnchor="middle" fill="#67e8f9" fontWeight="bold">{year}</text>
+          </g>
+        )}
+        <WallClock x={562} y={142} hour={hour} />
+      </g>
 
       {/* Lámpara */}
       <line x1="340" y1="0" x2="340" y2="34" stroke="#44403c" strokeWidth="2" />
@@ -815,6 +827,27 @@ function Home({ props }: { props: EarthSceneProps }) {
 }
 
 /** Un familiar llega caminando, se arrodilla a dejar flores, se queda un momento y se va. */
+/** Reloj de pared redondo con la hora del día (clickeable para comparar relojes). */
+function WallClock({ x, y, hour }: { x: number; y: number; hour: number }) {
+  const hand = (a: number, l: number) => [x + Math.sin((a * Math.PI) / 180) * l, y - Math.cos((a * Math.PI) / 180) * l];
+  const [hx, hy] = hand(((hour % 12) / 12) * 360, 6);
+  const [mx, my] = hand((hour % 1) * 360, 9);
+  return (
+    <g>
+      <circle className="clock-ring" cx={x} cy={y} r="17" fill="none" stroke="#fde68a" strokeWidth="2" opacity="0" />
+      <circle className="clock-face" cx={x} cy={y} r="13" fill="#f8fafc" stroke={INK} strokeWidth="2" />
+      {Array.from({ length: 12 }, (_, i) => {
+        const [x1, y1] = hand(i * 30, 11);
+        const [x2, y2] = hand(i * 30, 9.5);
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={INK} strokeWidth={i % 3 ? 0.6 : 1.2} />;
+      })}
+      <line x1={x} y1={y} x2={hx} y2={hy} stroke={INK} strokeWidth="1.8" />
+      <line x1={x} y1={y} x2={mx} y2={my} stroke="#0891b2" strokeWidth="1.2" />
+      <circle cx={x} cy={y} r="1.3" fill={INK} />
+    </g>
+  );
+}
+
 /** Guirnalda de banderines con un cartel al centro (cumpleaños). */
 export function Bunting({ x0, x1, y, t, text }: { x0: number; x1: number; y: number; t: number; text: string }) {
   const n = 14;

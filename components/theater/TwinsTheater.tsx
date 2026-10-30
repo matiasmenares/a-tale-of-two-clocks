@@ -12,7 +12,6 @@ import { techAt } from "@/lib/tech";
 import { arrivalTau, earthToShip, shipToEarth } from "@/lib/comms";
 import { bioYears, inCryo, tauAtBio } from "@/lib/cryo";
 import { dopplerOf, fuel, headlineFor, inbox, shield } from "@/lib/voyage";
-import { StarMap } from "../StarMap";
 import { EarthScene } from "./EarthScene";
 import { ShipScene } from "./ShipScene";
 import { useSoundscape } from "./useSoundscape";
@@ -187,7 +186,7 @@ function BirthdayNote({ age }: { age: number }) {
 
 const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee", decel: "#a78bfa", stay: "#f472b6", surface: "#f97316" };
 
-export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data") => void }) {
+export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data" | "clocks") => void }) {
   const { stage, ship, trip, lifespan, destination, cinematicTime } = sim;
   const [copied, setCopied] = useState(false);
   const [sound, setSound] = useState(false);
@@ -377,6 +376,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           earthAlive={earthAlive}
           souvenir={sim.roundTrip && destination.planet && shipAlive ? { color: destination.planet.rock, from: destination.name } : undefined}
           focusX={earthFocus}
+          onOpenClocks={() => onOpen("clocks")}
           party={earthBirthday !== null}
           welcome={welcome}
         />
@@ -611,6 +611,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           cryo={cryo}
           outside={{ years: earthYears, deathYears }}
           focusX={shipFocus}
+          onOpenMap={() => onOpen("map")}
+          onOpenClocks={() => onOpen("clocks")}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
         />
@@ -659,27 +661,6 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
           </div>
           {flying && <div className={`mt-1.5 ${SECONDARY}`}><SpeedBadge self={sim.shipPlayback} other={sim.earthPlayback} otherName={EARTH_NAME} /></div>}
-        </Hud>
-        <Hud className={`bottom-3 left-3 w-36 p-2 ${stage === "done" ? "hidden" : `hidden sm:block ${SECONDARY}`}`}>
-          <div className="hud-label mb-1 text-cyan-300">Navegación</div>
-          <div className="aspect-square">
-            <StarMap trip={trip} ship={ship} destination={destination} flying={flying} compact />
-          </div>
-          <div className="mt-1 font-mono text-[10px] leading-tight text-slate-300">
-            {flying ? (
-              <>
-                a {formatLy(ship.x)} de la Tierra
-                <br />
-                {ship.phase.leg === "ida" ? `faltan ${formatLy(Math.max(0, D - ship.x))} a ${destination.name}` : `volviendo · faltan ${formatLy(ship.x)}`}
-              </>
-            ) : (
-              <>
-                destino: {destination.name}
-                <br />
-                {formatLy(D)} de distancia
-              </>
-            )}
-          </div>
         </Hud>
         {flying && !reunion && (
           <Hud className={`bottom-3 right-3 max-w-sm space-y-1 text-xs text-slate-300 ${SECONDARY}`}>
