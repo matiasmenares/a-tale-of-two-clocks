@@ -1,4 +1,4 @@
-import { activityAt, calendar, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
+import { activityAt, birthdayGuests, calendar, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
 import { techAt } from "@/lib/tech";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { skyColors, STAR_POINTS } from "./sky";
@@ -405,7 +405,7 @@ function Home({ props }: { props: EarthSceneProps }) {
   const facing = strolling ? (Math.cos(gestureT * 0.18) >= 0 ? 1 : -1) : act && act.walkingFrom !== undefined && act.place < act.walkingFrom ? -1 : 1;
   const asleep = dying || act?.pose === "sleep";
   // Dónde está y qué hace el perro según lo que haga Martín.
-  const dogState: DogState = asleep ? "lie" : act?.pose === "walk" ? "walk" : act?.pose === "exercise" || act?.label === "Visita de la familia" ? "play" : act?.pose === "sit" || act?.pose === "read" || act?.pose === "guitar" ? "lie" : "sit";
+  const dogState: DogState = asleep ? "lie" : act?.pose === "walk" ? "walk" : act?.pose === "exercise" || act?.label === "Visita de la familia" || act?.label === "Celebrando su cumpleaños" ? "play" : act?.pose === "sit" || act?.pose === "read" || act?.pose === "guitar" ? "lie" : "sit";
   const dogX = asleep
     ? 200
     : act?.pose === "walk"
@@ -592,7 +592,12 @@ function Home({ props }: { props: EarthSceneProps }) {
           {[-6, 0, 6].map((cx) => (
             <g key={cx}>
               <rect x={cx - 1} y="-19" width="2" height="7" fill="#60a5fa" />
-              <ellipse cx={cx} cy={-21 + Math.sin(gestureT * 9 + cx) * 0.6} rx="1.4" ry="2.4" fill="#fbbf24" />
+              {/* Velas encendidas hasta que las sopla (19:00); después, un hilo de humo */}
+              {timelapse || hour < 19 ? (
+                <ellipse cx={cx} cy={-21 + Math.sin(gestureT * 9 + cx) * 0.6} rx="1.4" ry="2.4" fill="#fbbf24" />
+              ) : hour < 19.25 ? (
+                <path d={`M${cx} -20 q2 -4 0 -7 q-2 -4 0 -8`} stroke="#cbd5e1" strokeWidth="0.8" fill="none" opacity={1 - (hour - 19) / 0.25} />
+              ) : null}
             </g>
           ))}
         </g>
@@ -708,10 +713,9 @@ function Home({ props }: { props: EarthSceneProps }) {
       ) : null}
       {act?.pose === "guitar" && !ghosts && !asleep && <MusicNotes x={px + 26} y={GROUND - 64} t={gestureT} skill={guitar.skill} />}
       {/* Visita de la familia: un adulto y, cuando Martín ya es abuelo, nietos corriendo */}
-      {(act?.label === "Visita de la familia" || (party && !asleep)) && !ghosts && (
+      {act?.label === "Visita de la familia" && !ghosts && !party && (
         <>
-          <Person x={520} y={GROUND} age={Math.max(28, age - 30)} pose="wave" t={gestureT + 2} facing={-1} color="#be185d" mood={party ? "joy" : undefined} />
-          {party && <Person x={570} y={GROUND} age={Math.max(30, age - 2)} pose="wave" t={gestureT + 4.5} facing={-1} color="#0e7490" mood="joy" />}
+          <Person x={520} y={GROUND} age={Math.max(28, age - 30)} pose="wave" t={gestureT + 2} facing={-1} color="#be185d" />
           {age >= 60 &&
             [0, 1].map((k) => {
               const ph = gestureT * (0.35 + k * 0.1) + k * 2;
@@ -720,6 +724,7 @@ function Home({ props }: { props: EarthSceneProps }) {
             })}
         </>
       )}
+      {party && !asleep && <BirthdayGuests age={age} hour={hour} t={gestureT} timelapse={timelapse} />}
       {/* El perro de la casa */}
       {dog && (
         <Dog
@@ -830,6 +835,63 @@ export function Confetti({ t, drift = false }: { t: number; drift?: boolean }) {
         const y = drift ? 40 + ((hash(k + 5) * 200 + Math.sin(t * 0.5 + k) * 30) % 220) : (hash(k + 5) * 300 + t * (40 + (k % 5) * 10)) % 300;
         return <rect key={k} x={x} y={y} width="4" height="2.4" fill={colors[k % colors.length]} transform={`rotate(${t * 120 + k * 40} ${x + 2} ${y + 1})`} />;
       })}
+    </g>
+  );
+}
+
+/**
+ * Invitados al cumpleaños de Martín. Llegan a las 18:00 con un regalo, a las 18:30 le cantan
+ * «Cumpleaños feliz», a las 19:00 sopla las velas, conversan con una taza en la mano y a las 22:30 se van.
+ * Los niños se dibujan más chicos según su edad.
+ */
+function BirthdayGuests({ age, hour, t, timelapse }: { age: number; hour: number; t: number; timelapse: boolean }) {
+  const { guests } = birthdayGuests(age);
+  const door = 840;
+  const slot = (i: number) => 410 + i * 50;
+  const ease = (v: number) => Math.min(1, Math.max(0, v));
+  const singing = !timelapse && hour >= 18.5 && hour < 19;
+  return (
+    <g>
+      {guests.map((g, i) => {
+        const scale = g.age < 16 ? 0.5 + Math.max(0, g.age) * 0.03 : 1;
+        if (g.age < 2) return null; // los recién nacidos todavía no van
+        if (timelapse) return <Person key={g.name} x={slot(i)} y={GROUND} age={g.age} pose="stand" t={t + i} scale={scale} facing={-1} color={g.color} opacity={0.45} />;
+        // Llegada escalonada y salida
+        const arrive = ease((hour - 18 - i * 0.04) / 0.3);
+        const leave = ease((hour - 22.5 - i * 0.03) / 0.3);
+        if (arrive <= 0 || leave >= 1) return null;
+        const x = leave > 0 ? slot(i) + (door - slot(i)) * leave : door + (slot(i) - door) * arrive;
+        const walking = (arrive > 0 && arrive < 1) || leave > 0;
+        const walked = leave > 0 ? (door - slot(i)) * leave : (door - slot(i)) * arrive;
+        const chatting = hour >= 19 && leave === 0;
+        const pose = walking ? "walk" : singing ? "wave" : chatting && Math.sin(t * 0.4 + i * 1.7) > 0.6 ? "wave" : "stand";
+        return (
+          <Person
+            key={g.name}
+            x={x}
+            y={GROUND}
+            age={g.age}
+            pose={pose}
+            t={walking ? walkClock(walked, g.age) : t + i}
+            scale={scale}
+            // Conversando, algunos se dan vuelta hacia el de al lado.
+            facing={leave > 0 || (chatting && i % 2 === 1 && Math.sin(t * 0.15 + i) > 0) ? 1 : -1}
+            color={g.color}
+            prop={walking && leave === 0 ? "gift" : chatting && g.age >= 18 ? "mug" : undefined}
+            propColor={["#f43f5e", "#38bdf8", "#a78bfa", "#4ade80", "#fb923c", "#facc15"][i % 6]}
+            mood={leave > 0 ? "happy" : "joy"}
+          />
+        );
+      })}
+      {/* Regalos que dejaron junto al sillón */}
+      {!timelapse && hour >= 18.35 && hour < 23 &&
+        guests.filter((g) => g.age >= 2).map((g, i) => (
+          <g key={g.name} transform={`translate(${352 + (i % 3) * 13} ${GROUND - 9 - Math.floor(i / 3) * 10})`}>
+            <rect x="-6" y="-1" width="12" height="10" rx="1" fill={["#f43f5e", "#38bdf8", "#a78bfa", "#4ade80", "#fb923c", "#facc15"][i % 6]} stroke={INK} strokeWidth="1" />
+            <path d="M0 -1 V9 M-6 4 H6" stroke="#fde047" strokeWidth="1.4" />
+          </g>
+        ))}
+      {singing && <MusicNotes x={470} y={GROUND - 80} t={t} skill={0.6} />}
     </g>
   );
 }

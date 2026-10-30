@@ -5,7 +5,7 @@ import { CINEMATIC_SECONDS, type Sim } from "@/hooks/useSimulation";
 import { START_AGE, type Derived } from "@/lib/derive";
 import { fmt, formatAge, formatBeta, formatFactor, formatLy, formatPlayback, formatYears } from "@/lib/format";
 import {
-  activityAt, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
+  activityAt, birthdayGuests, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
 } from "@/lib/life";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { techAt } from "@/lib/tech";
@@ -86,6 +86,24 @@ function Hud({ children, className = "", accent }: { children: ReactNode; classN
 /** Lo que se esconde en pantallas chicas (celular vertical o apaisado) para no tapar las escenas. */
 const SECONDARY = "max-sm:hidden [@media(max-height:520px)]:hidden";
 
+/** Quiénes van al cumpleaños de Martín y a quiénes ya no puede invitar. */
+function BirthdayNote({ age }: { age: number }) {
+  const { guests, gone, away, frail } = birthdayGuests(age);
+  const friends = guests.filter((g) => g.role === "amigo" || g.role === "amiga").map((g) => g.name);
+  const family = guests.filter((g) => g.role !== "amigo" && g.role !== "amiga" && g.age >= 2).map((g) => g.name);
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}` : xs[0]);
+  return (
+    <div className="mt-0.5 text-xs text-pink-300">
+      <b>🎂 ¡Cumple {age} años!</b>{" "}
+      {friends.length ? `Lo visitan ${list(friends)}` : "Ya no quedan amigos que puedan venir"}
+      {family.length > 0 && <>{friends.length ? ", con " : "; lo acompaña "}{list(family)}</>}.
+      {gone.length > 0 && <span className="text-slate-400"> Extraña a {list(gone)}.</span>}
+      {away.length > 0 && <span className="text-slate-400"> {list(away)} lo llama desde lejos.</span>}
+      {frail.length > 0 && <span className="text-slate-400"> {list(frail)} ya no sale de casa: lo saluda por teléfono.</span>}
+    </div>
+  );
+}
+
 const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee", decel: "#a78bfa", stay: "#f472b6", surface: "#f97316" };
 
 export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data") => void }) {
@@ -153,8 +171,6 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const live = stage === "flight";
   const kEarth = Math.floor(earthYears);
   const earthBirthday = live && earthAlive && kEarth >= 1 && earthYears - kEarth < winE ? START_AGE + kEarth : null;
-  const kShip = Math.floor(shipYears);
-  const shipBirthday = live && shipAlive && !cryo && kShip >= 1 && shipYears - kShip < winS ? kShip : null;
   // Saludos de cumpleaños: cada uno graba un mensaje el día que cumple, y le llega al otro cuando llega esa luz.
   const kFromEarth = Math.floor(d.earthSeenFromShip);
   const greetFromEarth =
@@ -243,7 +259,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             )}
             {earthAlive && earthTimelapse && <> · los días pasan volando</>}
           </div>
-          {earthBirthday && <div className="mt-0.5 text-xs font-semibold text-pink-300">🎂 ¡Cumple {earthBirthday} años! Fiesta con la familia</div>}
+          {earthBirthday && <BirthdayNote age={earthBirthday} />}
           {greetFromShip && (
             <div className="mt-0.5 text-xs text-amber-200">
               📨 Llegó el saludo que {SHIP_NAME} grabó al cumplir {greetFromShip.age}: la luz tardó {formatYears(earthYears - greetFromShip.sentAt)}
@@ -392,7 +408,6 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           cryo={cryo}
           outside={{ years: earthYears, deathYears }}
           focusX={shipFocus}
-          party={shipBirthday !== null}
           millerProgress={destination.miller && ship.phase.kind === "stay" ? (shipYears - ship.phase.tau0) / (ship.phase.tau1 - ship.phase.tau0) : null}
           sky={sky}
         />
@@ -425,7 +440,6 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {doomed && (
               <div className="text-xs text-amber-300">⚠️ Despierto no le alcanza la vida para terminar el viaje: vuelve a activar ❄️ hipersueño.</div>
             )}
-            {shipBirthday && <div className="text-xs font-semibold text-pink-300">🎂 ¡Cumple {Math.floor(shipAge)} años! Celebra solo en la nave</div>}
             {greetFromEarth && (
               <div className="text-xs text-cyan-200">
                 📨 Llegó el saludo que {EARTH_NAME} grabó al cumplir {START_AGE + greetFromEarth}: la luz tardó {formatYears(ship.t - greetFromEarth)}

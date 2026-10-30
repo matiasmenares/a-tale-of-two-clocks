@@ -604,6 +604,14 @@ export function Person({
 function HeldProp({ prop, hand, hip, t, color }: { prop: Prop; hand: [number, number]; hip: [number, number]; t: number; color?: string }) {
   const [hx, hy] = hand;
   switch (prop) {
+    case "gift":
+      return (
+        <g transform={`translate(${hx + 1} ${hy - 6})`}>
+          <rect x="-6" y="-4" width="12" height="10" rx="1" fill={color ?? "#f43f5e"} stroke={INK} strokeWidth="1" />
+          <path d="M0 -4 V6 M-6 1 H6" stroke="#fde047" strokeWidth="1.6" />
+          <path d="M0 -4 q-5 -5 -5 -1 q0 2 5 1 q5 1 5 -1 q0 -4 -5 1" fill="none" stroke="#fde047" strokeWidth="1.2" />
+        </g>
+      );
     case "rock":
       return (
         <g transform={`translate(${hx + 2} ${hy - 2})`}>

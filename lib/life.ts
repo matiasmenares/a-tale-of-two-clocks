@@ -9,7 +9,7 @@ export type Pose =
   | "exercise" | "reach" | "water" | "guitar" | "violin" | "read" | "offer";
 
 /** Objeto que lleva en la mano. */
-export type Prop = "book" | "mug" | "can" | "tool" | "camera" | "guitar" | "violin" | "tablet" | "rock" | "flag";
+export type Prop = "book" | "mug" | "can" | "tool" | "camera" | "guitar" | "violin" | "tablet" | "rock" | "flag" | "gift";
 
 export interface Activity {
   label: string;
@@ -86,6 +86,8 @@ function earthSchedule(hour: number, age: number, years: number): Activity {
   const retired = age >= 67;
   const free = retired || weekend;
   if (hour < 7 || hour >= 23) return { label: "Durmiendo", pose: "sleep", place: EARTH_PLACES.bed };
+  // Su cumpleaños: en la tarde recibe a los invitados junto a la mesa con la torta.
+  if (isBirthday(years) && hour >= 18) return { label: "Celebrando su cumpleaños", pose: "stand", place: BIRTHDAY_SPOT };
   if (hour < 7.5)
     return age < 60
       ? { label: "Gimnasia matinal", pose: "exercise", place: EARTH_PLACES.center }
@@ -178,6 +180,53 @@ export function activityAt(who: "earth" | "ship", years: number, age: number): A
     if (lo < 10) return { ...now, pose: "walk", walkingFrom: before.place, walkT: lo / 10 };
   }
   return now;
+}
+
+/** Los gemelos despegaron el día que cumplían 30: cada año de su reloj es un cumpleaños. */
+export const isBirthday = (years: number) => years >= 1 && years - Math.floor(years) < 1 / 365.25;
+/** Dónde recibe Martín a los invitados (junto a la mesa con la torta). */
+export const BIRTHDAY_SPOT = 0.4;
+
+export interface Guest {
+  name: string;
+  age: number;
+  color: string;
+  /** Cómo se relaciona con Martín (para el texto del panel). */
+  role: "amigo" | "amiga" | "hija" | "nieto" | "nieta";
+}
+
+/**
+ * Amigos de Martín a lo largo de la vida: cada uno envejece con él, algunos llegan más tarde (trabajo,
+ * barrio), otros se van lejos y todos tarde o temprano mueren. Edades relativas a Martín.
+ */
+const FRIENDS = [
+  { name: "Diego", role: "amigo", offset: 0, color: "#0e7490", since: 30, until: 200, dies: 76 }, // del colegio
+  { name: "Camila", role: "amiga", offset: 1, color: "#db2777", since: 30, until: 52, dies: 89 }, // se muda al extranjero
+  { name: "Pedro", role: "amigo", offset: -2, color: "#65a30d", since: 30, until: 200, dies: 81 },
+  { name: "Valentina", role: "amiga", offset: -4, color: "#7c3aed", since: 41, until: 200, dies: 92 }, // del trabajo
+  { name: "Jorge", role: "amigo", offset: 3, color: "#b45309", since: 58, until: 200, dies: 79 }, // vecino
+] as const;
+
+/** Quiénes van al cumpleaños de Martín a esta edad, y a qué amigos ya perdió. */
+export function birthdayGuests(age: number): { guests: Guest[]; gone: string[]; away: string[]; frail: string[] } {
+  const guests: Guest[] = [];
+  const gone: string[] = [];
+  const away: string[] = [];
+  const frail: string[] = [];
+  for (const f of FRIENDS) {
+    const fa = age + f.offset;
+    if (age < f.since) continue;
+    if (fa >= f.dies) gone.push(f.name);
+    else if (age >= f.until) away.push(f.name);
+    // Pasados los 84 ya casi no salen de casa: llaman por teléfono.
+    else if (fa >= 84) frail.push(f.name);
+    else guests.push({ name: f.name, age: fa, color: f.color, role: f.role });
+  }
+  // Su hija Sofía (nació cuando él tenía 28) y, desde que él tiene 61, los nietos.
+  guests.push({ name: "Sofía", age: age - 28, color: "#e11d48", role: "hija" });
+  if (age >= 64) guests.push({ name: "Tomi", age: age - 61, color: "#f59e0b", role: "nieto" });
+  if (age >= 67) guests.push({ name: "Amanda", age: age - 64, color: "#16a34a", role: "nieta" });
+  return { guests: guests.slice(0, 6), gone, away, frail };
 }
 
 /** Rasgos visuales según la edad. */
