@@ -1,19 +1,21 @@
 "use client";
 
-import { DESTINATIONS, PHASE_LABEL, stateAt } from "@/lib/relativity";
+import { DESTINATIONS, PHASE_LABEL, stateAt, tauFromT } from "@/lib/relativity";
 import { CINEMATIC_SECONDS, type Sim } from "@/hooks/useSimulation";
 import { START_AGE, type Derived } from "@/lib/derive";
 import { fmt, formatAge, formatBeta, formatFactor, formatLy, formatPlayback, formatYears } from "@/lib/format";
 import {
-  activityAt, birthdayGuests, weatherAt, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
+  activityAt, birthdayGuests, lifeEventAt, weatherAt, calendar, EARTH_NAME, earthEpoch, fmtYear, hourOfDay, LAUNCH_YEAR, musicSkill, practiceHours, recentPetLoss, season, SEASON_ICON, SHIP_NAME, surfaceActivity,
 } from "@/lib/life";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { techAt } from "@/lib/tech";
 import { arrivalTau, earthToShip, shipToEarth } from "@/lib/comms";
 import { bioYears, inCryo, tauAtBio } from "@/lib/cryo";
+import { dopplerOf, fuel, headlineFor, inbox, shield } from "@/lib/voyage";
 import { StarMap } from "../StarMap";
 import { EarthScene } from "./EarthScene";
 import { ShipScene } from "./ShipScene";
+import { useSoundscape } from "./useSoundscape";
 
 const SEC_PER_YEAR = 365.25 * 86_400;
 const LY_KM = 9.4607e12;
@@ -86,6 +88,81 @@ function Hud({ children, className = "", accent }: { children: ReactNode; classN
 /** Lo que se esconde en pantallas chicas (celular vertical o apaisado) para no tapar las escenas. */
 const SECONDARY = "max-sm:hidden [@media(max-height:520px)]:hidden";
 
+/** Desglose de un intervalo en años, días, horas, minutos y segundos. */
+function breakdownTime(years: number) {
+  const totalSec = Math.max(0, years) * 365.25 * 86_400;
+  const y = Math.floor(totalSec / (365.25 * 86_400));
+  let rest = totalSec - y * 365.25 * 86_400;
+  const dd = Math.floor(rest / 86_400);
+  rest -= dd * 86_400;
+  const h = Math.floor(rest / 3600);
+  rest -= h * 3600;
+  const m = Math.floor(rest / 60);
+  const s = Math.floor(rest - m * 60);
+  return { y, d: dd, h, m, s };
+}
+
+/** Reloj de bolsillo: las agujas muestran la hora que marca después de `years` desde el despegue (9:00). */
+function Watch({ years, name, color }: { years: number; name: string; color: string }) {
+  const hours = 9 + years * 365.25 * 24;
+  const hA = ((hours % 12) / 12) * 360;
+  const mA = (((hours * 60) % 60) / 60) * 360;
+  const hand = (a: number, l: number) => [50 + Math.sin((a * Math.PI) / 180) * l, 50 - Math.cos((a * Math.PI) / 180) * l];
+  const [hx, hy] = hand(hA, 20);
+  const [mx, my] = hand(mA, 30);
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 100 112" className="h-16 w-14 sm:h-20 sm:w-[4.5rem]">
+        <circle cx="50" cy="8" r="6" fill="none" stroke="#d4a017" strokeWidth="3" />
+        <rect x="45" y="12" width="10" height="6" rx="2" fill="#d4a017" />
+        <circle cx="50" cy="56" r="40" fill="#fef9c3" stroke="#d4a017" strokeWidth="6" />
+        <g transform="translate(0 6)">
+          {Array.from({ length: 12 }, (_, i) => {
+            const [x1, y1] = hand(i * 30, 34);
+            const [x2, y2] = hand(i * 30, i % 3 ? 31 : 28);
+            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#1e1b2e" strokeWidth={i % 3 ? 1.5 : 3} />;
+          })}
+          <line x1="50" y1="50" x2={hx} y2={hy} stroke="#1e1b2e" strokeWidth="4" strokeLinecap="round" />
+          <line x1="50" y1="50" x2={mx} y2={my} stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="50" cy="50" r="3" fill="#1e1b2e" />
+        </g>
+      </svg>
+      <div className="hud-label text-[10px]" style={{ color }}>{name}</div>
+    </div>
+  );
+}
+
+/** Los dos relojes que pusieron en hora al despegar, juntos otra vez, y cuánto se desfasaron. */
+function PocketWatches({ earth, ship }: { earth: number; ship: number }) {
+  const diff = breakdownTime(earth - ship);
+  return (
+    <div className="mt-2 flex items-center justify-center gap-3">
+      <Watch years={earth} name={EARTH_NAME} color="#0891b2" />
+      <div className="max-w-[12rem] text-left text-[11px] leading-snug text-slate-300">
+        Pusieron en hora estos dos relojes al despegar. Hoy el de {SHIP_NAME} va atrasado:
+        <div className="mt-0.5 font-mono text-amber-200">
+          {diff.y > 0 && `${fmt(diff.y, 0)} a `}
+          {diff.d} d {diff.h} h {diff.m} min {diff.s} s
+        </div>
+      </div>
+      <Watch years={ship} name={SHIP_NAME} color="#d97706" />
+    </div>
+  );
+}
+
+/** Barrita de nivel (combustible, escudo). */
+function Gauge({ label, value, color, note }: { label: string; value: number; color: string; note?: string }) {
+  return (
+    <div title={note}>
+      <div className="hud-label text-slate-500">{label}</div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className={`h-full ${color}`} style={{ width: `${Math.max(1, value * 100)}%` }} />
+      </div>
+      <div className="font-mono text-[10px] text-slate-400">{fmt(value * 100, value < 0.1 ? 1 : 0)} %</div>
+    </div>
+  );
+}
+
 /** Quiénes van al cumpleaños de Martín y a quiénes ya no puede invitar. */
 function BirthdayNote({ age }: { age: number }) {
   const { guests, gone, away, frail } = birthdayGuests(age);
@@ -108,6 +185,8 @@ const PHASE_COLOR: Record<string, string> = { accel: "#f59e0b", cruise: "#22d3ee
 
 export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen: (p: "map" | "control" | "data") => void }) {
   const { stage, ship, trip, lifespan, destination, cinematicTime } = sim;
+  const [copied, setCopied] = useState(false);
+  const [sound, setSound] = useState(false);
   const clocks = useGestureClocks(sim.earthPlayback, sim.shipPlayback, (stage === "flight" || stage === "cinematic") && !sim.playing);
   const flying = stage === "flight" || stage === "done";
 
@@ -185,6 +264,52 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
       ? { age: Math.floor(START_AGE + bioYears(trip, kFromShip, sim.sleep)), sentAt: sent.t }
       : null;
 
+  // Martín ve por el telescopio que la nave dio la vuelta cuando le llega esa luz; la nave viene casi
+  // pegada a su propia luz, así que llega muy poco después.
+  const turn = trip.phases.find((p) => p.leg === "vuelta");
+  const turnSeenAt = turn ? stateAt(trip, turn.tau0).t + stateAt(trip, turn.tau0).x : Infinity;
+  const welcome = sim.roundTrip && live && earthAlive && earthYears >= turnSeenAt;
+  const lifeEvent = live && calmE && earthAlive ? lifeEventAt(earthAge, sim.playing ? Math.max(30 / 365.25, sim.earthPlayback * 2) : 30 / 365.25) : null;
+
+  // Sonido: solo lo que pasa a velocidad "humana" y con la simulación corriendo.
+  const running = sim.playing || stage === "cinematic";
+  const launchSec = shipYears * SEC_PER_YEAR;
+  useSoundscape(sound, {
+    rumble: !running ? 0 : stage === "cinematic" ? Math.max(0, (cinematicTime - 12) / 4) : stage === "flight" && launchSec < 600 ? 1 - launchSec / 600 : 0,
+    hum: running && live && !shipTimelapse && ship.phase.kind !== "surface" && !(destination.miller && ship.phase.kind === "stay"),
+    rain: running && !earthTimelapse && (earthSetting === "home" || (earthSetting === "after" && (epoch.key === "grave" || epoch.key === "future"))) ? weatherAt(earthYears).rain : 0,
+    guitar: running && !earthTimelapse && earthSetting === "home" && earthAct?.pose === "guitar" && earthAct.walkingFrom === undefined ? musicSkill(practiceHours("earth", earthYears)).skill : null,
+    violin: running && live && !shipTimelapse && !cryo && shipAct?.pose === "violin" && shipAct.walkingFrom === undefined ? musicSkill(practiceHours("ship", shipYears)).skill : null,
+    singing: running && !earthTimelapse && earthBirthday !== null && hourOfDay(earthYears) >= 18.5 && hourOfDay(earthYears) < 19 ? earthBirthday : null,
+  });
+
+  // Marcas en la barra de progreso (en tiempo de la nave).
+  const marks = (() => {
+    const list: { tau: number; icon: string; label: string }[] = [];
+    const arrive = trip.phases.find((p) => p.kind === "surface" || p.kind === "stay");
+    const outEnd = trip.phases.filter((p) => p.leg === "ida").at(-1);
+    if (arrive) list.push({ tau: arrive.tau0 + 1e-6, icon: "🪐", label: `Llegada a ${destination.name}` });
+    else if (outEnd && sim.roundTrip) list.push({ tau: outEnd.tau1 - 1e-6, icon: "🎯", label: `Llegada a ${destination.name}` });
+    if (turn) list.push({ tau: turn.tau0 + 1e-6, icon: "↩️", label: "Media vuelta: empieza el regreso" });
+    for (const age of [40, 50, 60, 70, 80]) {
+      if (age >= lifespan) break;
+      const tau = tauFromT(trip, age - START_AGE);
+      if (tau < trip.totalTau) list.push({ tau: tau + 1e-6, icon: "🎂", label: `${EARTH_NAME} cumple ${age}` });
+    }
+    const earthDeath = tauFromT(trip, deathYears);
+    if (earthDeath < trip.totalTau) list.push({ tau: earthDeath, icon: "🕯️", label: `Muere ${EARTH_NAME}` });
+    const shipDeath = tauAtBio(trip, deathYears, sim.sleep);
+    if (shipDeath < trip.totalTau) list.push({ tau: shipDeath, icon: "✝️", label: `Muere ${SHIP_NAME}` });
+    list.push({ tau: trip.totalTau, icon: sim.roundTrip ? "🤝" : "🏁", label: sim.roundTrip ? "Reencuentro" : "Fin del viaje" });
+    return list;
+  })();
+
+  // Bandeja de mensajes semanales de Martín: con el Doppler llegan a cuentagotas al alejarse y de golpe al volver.
+  const mail = inbox(d.earthSeenFromShip, deathYears, dopplerOf(ship, trip.stayRate));
+  const tank = fuel(trip, shipYears);
+  const armor = shield(trip, shipYears);
+  const news = headlineFor(LAUNCH_YEAR + Math.floor(d.earthSeenFromShip));
+
   // Hacia dónde mira la cámara en pantallas angostas: el personaje o lo que está pasando.
   const placeX = (a: { place: number; walkingFrom?: number; walkT?: number }) =>
     (a.walkingFrom !== undefined ? a.walkingFrom + (a.place - a.walkingFrom) * (a.walkT ?? 0) : a.place) * 800;
@@ -245,6 +370,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           souvenir={sim.roundTrip && destination.planet && shipAlive ? { color: destination.planet.rock, from: destination.name } : undefined}
           focusX={earthFocus}
           party={earthBirthday !== null}
+          welcome={welcome}
         />
         <Hud accent="cyan" className="left-2 top-2 max-w-[min(25rem,calc(100%-1rem))] sm:left-3 sm:top-3">
           <div className="hud-label text-cyan-300">🌍 {EARTH_NAME} · Tierra</div>
@@ -271,6 +397,12 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             {earthAlive && earthTimelapse && <> · los días pasan volando</>}
           </div>
           {earthBirthday && <BirthdayNote age={earthBirthday} />}
+          {lifeEvent && <div className="mt-0.5 text-xs text-violet-300">⭐ {lifeEvent}</div>}
+          {welcome && (
+            <div className="mt-0.5 text-xs text-emerald-300">
+              🔭 Vio que la nave dio la vuelta y prepara la bienvenida: llega en {formatYears(Math.max(0, trip.totalT - earthYears))}
+            </div>
+          )}
           {greetFromShip && (
             <div className="mt-0.5 text-xs text-amber-200">
               📨 Llegó el saludo que {SHIP_NAME} grabó al cumplir {greetFromShip.age}: la luz tardó {formatYears(earthYears - greetFromShip.sentAt)}
@@ -365,6 +497,31 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           <button onClick={() => onOpen("data")} title="Datos" aria-label="Datos" className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}>
             📊 <span className="hidden xl:inline">Datos</span>
           </button>
+          <button
+            onClick={() => setSound((v) => !v)}
+            title={sound ? "Silenciar" : "Activar sonido: despegue, cabina, lluvia, guitarra, violín y cumpleaños"}
+            aria-label={sound ? "Silenciar" : "Activar sonido"}
+            className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}
+          >
+            {sound ? "🔊" : "🔇"}
+          </button>
+          <button
+            onClick={async () => {
+              const url = sim.shareUrl();
+              try {
+                await navigator.clipboard.writeText(url);
+              } catch {
+                window.prompt("Copia este link", url);
+              }
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }}
+            title="Copiar un link a este viaje en este momento"
+            aria-label="Compartir"
+            className={`${chip} text-slate-200 transition hover:border-cyan-300/50`}
+          >
+            {copied ? "✓" : "🔗"} <span className="hidden xl:inline">{copied ? "Copiado" : "Compartir"}</span>
+          </button>
           {countdown > 0 && countdown <= 10 && <span className="glow-amber font-mono text-lg font-bold text-amber-300">T−{countdown}</span>}
         </div>
         {/* Línea de tiempo de la misión por fases: se puede arrastrar para moverse por el viaje */}
@@ -393,6 +550,19 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               aria-label="Progreso del viaje"
               className="timeline absolute inset-0 h-full w-full"
             />
+            {/* Momentos clave: un clic salta directo a cada uno */}
+            {marks.map((m) => (
+              <button
+                key={m.label}
+                onClick={() => sim.seek(m.tau)}
+                title={m.label}
+                aria-label={m.label}
+                className="absolute -top-3 z-10 -translate-x-1/2 text-[11px] leading-none opacity-80 transition hover:scale-125 hover:opacity-100"
+                style={{ left: `${(m.tau / trip.totalTau) * 100}%` }}
+              >
+                {m.icon}
+              </button>
+            ))}
           </div>
           <span className="hud-label w-16 shrink-0 text-slate-400">{Math.round(progress * 100)} %</span>
         </div>
@@ -456,6 +626,12 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
                 📨 Llegó el saludo que {EARTH_NAME} grabó al cumplir {START_AGE + greetFromEarth}: la luz tardó {formatYears(ship.t - greetFromEarth)}
                 {!earthAlive && " — en la Tierra, él ya murió"}
               </div>
+            )}
+            {live && shipAlive && !cryo && mail.perShipWeek >= 7 && (
+              <div className="text-xs text-sky-300">📬 Le llegan de golpe los mensajes de {EARTH_NAME}: {fmt(mail.perShipWeek / 7, 0)} por día. Ve pasar años de su vida en semanas.</div>
+            )}
+            {live && shipAlive && !cryo && mail.received > 0 && mail.perShipWeek > 0 && mail.perShipWeek < 0.3 && (
+              <div className="text-xs text-rose-300/80">📭 Los mensajes de {EARTH_NAME} llegan a cuentagotas: uno cada {fmt(1 / mail.perShipWeek, 0)} semanas.</div>
             )}
             {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
@@ -521,6 +697,19 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
                 {deathNewsArrived && <b className="text-rose-300"> — llegó la noticia de su muerte</b>}
               </div>
             )}
+            <div className="grid grid-cols-3 gap-2 pt-0.5">
+              <Gauge label="Combustible" value={tank.left} color="bg-amber-400" />
+              <Gauge label="Escudo" value={armor.left} color="bg-sky-400" note={armor.patched ? "reparado con la reserva" : undefined} />
+              <div>
+                <div className="hud-label text-slate-500">Bandeja</div>
+                <div className="font-mono text-slate-100">📬 {fmt(mail.received, 0)}</div>
+              </div>
+            </div>
+            {stage !== "done" && news && (
+              <div className="text-slate-400">
+                📰 Última noticia de la Tierra ({fmtYear(news[0])}): <span className="text-slate-200">{news[1]}</span>
+              </div>
+            )}
             {rindler && d.earthSeenFromShip < 1.2 && outbound && (
               <div className="text-slate-500">Mientras acelera, la luz de la Tierra casi no lo alcanza (horizonte de Rindler).</div>
             )}
@@ -544,6 +733,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               {shipAlive ? <b className="text-amber-100">vivo · {formatAge(shipAge)}</b> : <b className="text-rose-300">murió en el viaje a los {lifespan}</b>}
             </div>
           </div>
+          {sim.roundTrip && <PocketWatches earth={d.earthProper} ship={d.shipProper} />}
           <p className="mt-2 text-xs text-slate-400 [@media(max-height:520px)]:hidden">
             En la Tierra pasaron {formatAge(d.earthProper).replace(" y", ",")}; en la nave, {formatAge(d.shipProper).replace(" y", ",")}. Nadie hizo trampa:
             el que viajó (y aceleró) vivió menos tiempo

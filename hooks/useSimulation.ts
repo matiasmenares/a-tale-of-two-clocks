@@ -76,6 +76,33 @@ export function useSimulation() {
     return stage === "flight" ? s : { ...s, beta: 0, gamma: 1, alpha: 0 };
   }, [trip, tau, stage]);
 
+  // Viaje compartido por link: al abrir la página se aplican los parámetros de la URL.
+  const pendingProgress = useRef<number | null>(null);
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (![...q.keys()].length) return;
+    const num = (k: string) => (q.has(k) && isFinite(Number(q.get(k))) ? Number(q.get(k)) : null);
+    const dest = q.get("d");
+    const dist = num("dist");
+    if (dest === "custom" && dist) setDestination({ id: "custom", name: "Destino personalizado", distance: dist, kind: "custom" });
+    else if (dest) {
+      const found = DESTINATIONS.find((x) => x.id === dest);
+      if (found) setDestination(found);
+    }
+    const b = num("b");
+    if (b !== null && b > 0 && b < 1) setBeta(b);
+    const g = num("g");
+    if (g !== null && g > 0) setAccelG(g);
+    if (q.has("rt")) setRoundTrip(q.get("rt") !== "0");
+    const v = num("v");
+    if (v !== null && v > START_AGE) setLifespan(v);
+    const r = num("r");
+    if (r !== null && r > 0) setRate(r);
+    if (q.get("h") === "1") setSleep([[0, Infinity]]);
+    const p = num("p");
+    if (p !== null && p > 0) pendingProgress.current = Math.min(1, p);
+  }, []);
+
   /** Momentos clave (tiempo de la nave) donde el director frena la cámara. */
   const events = useMemo(() => {
     const list = trip.phases.filter((p) => p.tau1 > p.tau0).map((p) => p.tau0);
@@ -87,6 +114,22 @@ export function useSimulation() {
     return list.filter((t) => t > 0);
   }, [trip, lifespan, sleep]);
 
+  /** Link que reproduce este viaje en este momento. */
+  const shareUrl = useCallback(() => {
+    const q = new URLSearchParams({
+      d: destination.id,
+      b: String(beta),
+      g: String(accelG),
+      rt: roundTrip ? "1" : "0",
+      v: String(lifespan),
+      r: String(rate),
+      p: (stage === "flight" || stage === "done" ? tau / trip.totalTau : 0).toFixed(5),
+    });
+    if (destination.id === "custom") q.set("dist", String(destination.distance));
+    if (sleep.length) q.set("h", "1");
+    return `${window.location.origin}${window.location.pathname}?${q}`;
+  }, [destination, beta, accelG, roundTrip, lifespan, rate, stage, tau, trip.totalTau, sleep]);
+
   // Si cambia el viaje, conservar la fracción recorrida.
   const prevTrip = useRef(trip);
   useEffect(() => {
@@ -97,6 +140,17 @@ export function useSimulation() {
       setSleep((w) => w.map(([s, e]) => [s * k, e * k] as const));
       prevTrip.current = trip;
     }
+  }, [trip]);
+
+  // (Va después del reescalado de arriba para que gane.) Llegado desde un link con progreso: saltar a ese momento cuando el viaje ya tiene los parámetros del link.
+  useEffect(() => {
+    const p = pendingProgress.current;
+    if (p === null) return;
+    pendingProgress.current = null;
+    const t = p * trip.totalTau;
+    tauRef.current = t;
+    setTau(t);
+    setStage(p >= 1 ? "done" : "flight");
   }, [trip]);
 
   // Bucle de animación del vuelo.
@@ -233,7 +287,7 @@ export function useSimulation() {
     beta, setBeta, accelG, setAccelG, roundTrip, setRoundTrip,
     stayEnabled, setStayEnabled, stayK, setStayK, stayYears, setStayYears,
     lifespan, setLifespan,
-    rate, setRate, master, setMaster, director, setDirector, hypersleep, setHypersleep, sleep,
+    rate, setRate, master, setMaster, director, setDirector, hypersleep, setHypersleep, sleep, shareUrl,
     stage, cinematicTime, playing, launch, reset, seek, togglePlay,
     trip, ship, tau, shipPlayback, earthPlayback,
   };

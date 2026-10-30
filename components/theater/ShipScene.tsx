@@ -451,12 +451,46 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       {/* Huerto hidropónico */}
       <rect x="300" y="40" width="92" height="56" rx="6" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
       <rect x="300" y="40" width="92" height="56" rx="6" fill="#a855f7" opacity="0.18" />
-      {Array.from({ length: 6 }, (_, i) => (
-        <g key={i} transform={`translate(${312 + i * 14} 86)`}>
-          <path d="M0 0 q-6 -10 0 -18 q6 8 0 18" fill="#22c55e" stroke={INK} strokeWidth="0.6" />
-          <path d="M0 0 q6 -8 2 -14" fill="none" stroke="#16a34a" strokeWidth="1.5" />
+      {/* Cultivos en ciclos de ~90 días: crecen, amarillean un poco antes de la cosecha y vuelven a brotar */}
+      {Array.from({ length: 6 }, (_, i) => {
+        const g = ((props.years * 365.25) / 90 + i * 0.07) % 1;
+        const s = 0.35 + g * 0.75;
+        const ripe = g > 0.85;
+        return (
+          <g key={i} transform={`translate(${312 + i * 14} 86) scale(${s})`}>
+            <path d="M0 0 q-6 -10 0 -18 q6 8 0 18" fill={ripe ? "#a3e635" : "#22c55e"} stroke={INK} strokeWidth="0.6" />
+            <path d="M0 0 q6 -8 2 -14" fill="none" stroke="#16a34a" strokeWidth="1.5" />
+            {ripe && <circle cx="3" cy="-12" r="2.4" fill="#ef4444" stroke={INK} strokeWidth="0.5" />}
+          </g>
+        );
+      })}
+      {/* Con los años la cabina se gasta: manchas, marcas de roce y parches de cinta */}
+      {props.stage !== "boarding" &&
+        Array.from({ length: Math.min(14, Math.floor(props.years / 1.5)) }, (_, k) => {
+          const x = 30 + ((k * 211) % 740);
+          const y = 150 + ((k * 37) % 80);
+          return <ellipse key={k} cx={x} cy={y} rx={6 + (k % 3) * 3} ry={2 + (k % 2)} fill="#1e293b" opacity="0.18" transform={`rotate(${(k * 23) % 40 - 20} ${x} ${y})`} />;
+        })}
+      {props.years > 8 && (
+        <g transform="rotate(-8 128 196)">
+          <rect x="112" y="190" width="34" height="9" fill="#cbd5e1" opacity="0.85" stroke="#94a3b8" strokeWidth="0.6" />
+          <path d="M112 190 v9 M146 190 v9" stroke="#94a3b8" strokeWidth="0.6" strokeDasharray="1 1" />
         </g>
-      ))}
+      )}
+      {/* Fotos que manda Martín: Tomás las va pegando en la pared */}
+      {Array.from({ length: Math.min(9, Math.floor(props.years / 2)) }, (_, k) => {
+        const spots = [[98, 72], [132, 96], [96, 120], [418, 64], [452, 86], [488, 62], [524, 88], [560, 66], [236, 112]];
+        const [x, y] = spots[k];
+        return (
+          <g key={k} transform={`rotate(${((k * 47) % 24) - 12} ${x + 10} ${y + 12})`}>
+            <rect x={x} y={y} width="20" height="24" fill="#f8fafc" stroke={INK} strokeWidth="1" />
+            <rect x={x + 2.5} y={y + 2.5} width="15" height="14" fill={["#7dd3fc", "#fcd34d", "#86efac", "#fca5a5", "#c4b5fd"][k % 5]} />
+            <circle cx={x + 10} cy={y + 9} r="3.2" fill="#f2c9a0" />
+            <rect x={x + 6.5} y={y + 12} width="7" height="4.5" rx="1.5" fill={k % 2 ? "#2563eb" : "#7c5c3b"} />
+            <circle cx={x + 10} cy={y + 1} r="1.4" fill="#ef4444" stroke={INK} strokeWidth="0.4" />
+          </g>
+        );
+      })}
       {/* Foto del hermano */}
       <rect x="176" y="56" width="42" height="52" fill="#fef3c7" stroke="#78350f" strokeWidth="3" />
       <circle cx="197" cy="75" r="8" fill="#f2c9a0" stroke={INK} strokeWidth="0.6" />

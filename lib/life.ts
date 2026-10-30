@@ -255,6 +255,28 @@ export function birthdayGuests(age: number): { guests: Guest[]; gone: string[]; 
   return { guests: guests.slice(0, 6), gone, away, frail };
 }
 
+/** Hitos de la vida de Martín (edad → qué pasó). */
+const LIFE_EVENTS: [number, string][] = [
+  [34, "Sofía empieza el colegio"],
+  [46, "Sofía entra a la universidad"],
+  [51, "Sofía se titula de ingeniera"],
+  [57, "Sofía se casa"],
+  [61, "Nace su primer nieto, Tomi"],
+  [64, "Nace su nieta, Amanda"],
+  [67, "Se jubila después de 40 años de trabajo"],
+  [78, "Se muda a un departamento más chico, cerca de Sofía"],
+];
+
+/** Hito que acaba de ocurrir (dentro de `window` años), si hay alguno. */
+export function lifeEventAt(age: number, window: number) {
+  return LIFE_EVENTS.find(([a]) => age >= a && age - a < window)?.[1] ?? null;
+}
+
+/** Edades de la familia de Martín en un momento dado (para el reencuentro, aunque él ya no esté). */
+export function familyAges(martinAge: number) {
+  return { sofia: martinAge - 28, tomi: martinAge - 61, amanda: martinAge - 64 };
+}
+
 /** Rasgos visuales según la edad. */
 export function looks(age: number) {
   const clamp = (x: number) => Math.min(1, Math.max(0, x));

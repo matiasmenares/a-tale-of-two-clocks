@@ -7,6 +7,7 @@ import { START_AGE, type Derived } from "@/lib/derive";
 import { formatAge, formatLy, formatYears, fmt } from "@/lib/format";
 import { EARTH_NAME, LAUNCH_YEAR, SHIP_NAME } from "@/lib/life";
 import { stateAt } from "@/lib/relativity";
+import { EXHAUST, fuel, shield } from "@/lib/voyage";
 import { useState, type ReactNode } from "react";
 import { ChapterTabs } from "./ControlPanel";
 import { GravityWell } from "./GravityWell";
@@ -176,6 +177,12 @@ function LiveData({ sim, d }: { sim: Sim; d: Derived }) {
           <Row label="Cada átomo de hidrógeno choca con" value={`${big(f.protonMeV)} MeV`} note="como un rayo cósmico: hace falta un escudo frontal" />
           <Row label="Impactos de átomos" value={`${big(f.hitsPerCm2s)} /cm²·s`} note="con ~1 átomo por cm³ en el espacio interestelar" />
           <Row label="Radiación de fondo justo adelante" value={`${big(f.cmbAheadK)} K`} note="el frío de 2,7 K del universo, calentado por el Doppler" />
+          <Row
+            label="Combustible: masa al despegar por cada kg que vuelve"
+            value={`${big(fuel(trip, 0).massRatio)} kg`}
+            note={`cohete de fotones ideal (el mejor posible); con antimateria realista serían ${big(fuel(trip, 0, EXHAUST.antimatter).massRatio)} kg`}
+          />
+          <Row label="Escudo frontal restante" value={`${fmt(shield(trip, ship.tau).left * 100, 0)} %`} note="agua y hielo que frenan los átomos interestelares; se rellena con la reserva" />
           <Row label="Factor de Lorentz γ" value={fmt(f.gamma, 3)} note={`por cada día de Tomás, en la Tierra pasan ${fmt(f.gamma, 2)} días (en crucero)`} />
           <Row label="Distancia que mide Tomás hasta el destino" value={formatLy(d.remainingContracted)} note={`en la Tierra miden ${formatLy(d.remainingProperDistance)} (contracción de Lorentz)`} />
         </div>

@@ -1,4 +1,4 @@
-import { activityAt, birthdayGuests, calendar, weatherAt, type Weather, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
+import { activityAt, birthdayGuests, calendar, familyAges, weatherAt, type Weather, catAt, dogAt, EARTH_NAME, musicSkill, petUrns, practiceHours, recentPetLoss, season, type Season, earthEpoch, iceLevel, LAUNCH_YEAR, looks, SHIP_NAME, type Epoch } from "@/lib/life";
 import { techAt } from "@/lib/tech";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { skyColors, STAR_POINTS } from "./sky";
@@ -38,6 +38,8 @@ export interface EarthSceneProps {
   focusX?: number;
   /** Es el cumpleaños de Martín: fiesta en casa. */
   party?: boolean;
+  /** Martín ya vio que la nave dio la vuelta: prepara la bienvenida. */
+  welcome?: boolean;
 }
 
 function Sky({ hour, timelapse, ice = 0, id, weather, t = 0 }: { hour: number; timelapse: boolean; ice?: number; id: string; weather?: Weather; t?: number }) {
@@ -705,6 +707,7 @@ function Home({ props }: { props: EarthSceneProps }) {
 
       {/* Cumpleaños: guirnalda colgada de lado a lado, delante de la biblioteca (por debajo de los paneles) */}
       {party && <Bunting x0={262} x1={580} y={112} t={gestureT} text={`¡FELIZ CUMPLE ${Math.floor(age)}!`} />}
+      {!party && props.welcome && <Bunting x0={262} x1={580} y={112} t={gestureT} text={`¡BIENVENIDO ${SHIP_NAME.toUpperCase()}!`} />}
 
       {/* Martín */}
       {ghosts ? (
@@ -1764,6 +1767,19 @@ function Reunion({ props }: { props: EarthSceneProps }) {
           timelapse={false}
           extraVisitor={shipAlive ? <Person x={300} y={GROUND} age={shipAge} pose="kneel" t={gestureT} outfit="flightsuit" flowers /> : undefined}
         />
+        {/* Si siguen vivos, la hija y los nietos de Martín lo reciben en su lugar */}
+        {shipAlive &&
+          (() => {
+            const fam = familyAges(30 + years);
+            const who = [
+              { name: "Sofía", age: fam.sofia, color: "#e11d48" },
+              { name: "Tomi", age: fam.tomi, color: "#f59e0b" },
+              { name: "Amanda", age: fam.amanda, color: "#16a34a" },
+            ].filter((f) => f.age >= 3 && f.age < 90);
+            return who.map((f, i) => (
+              <Person key={f.name} x={470 + i * 46} y={GROUND} age={f.age} pose={i === 0 ? "mourn" : "stand"} t={gestureT + i} facing={-1} color={f.color} mood="sad" scale={f.age < 16 ? 0.5 + f.age * 0.03 : 1} />
+            ));
+          })()}
         {!shipAlive && (
           <text x="400" y="60" fontSize="13" textAnchor="middle" fill="#f8fafc">La nave volvió sola: ninguno de los dos hermanos vivió para el reencuentro</text>
         )}
