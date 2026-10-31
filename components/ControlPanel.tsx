@@ -40,7 +40,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-cyan-400"
+        className="min-h-8 w-full accent-cyan-400"
       />
       {hint && <div className="text-[11px] text-slate-500">{hint}</div>}
     </label>
@@ -51,7 +51,9 @@ function Toggle({ on, onChange, children }: { on: boolean; onChange: (v: boolean
   return (
     <button
       onClick={() => onChange(!on)}
-      className={`rounded-lg border px-2.5 py-1 text-xs transition ${on ? "border-cyan-300 bg-cyan-400/15 text-cyan-100" : "border-white/15 text-slate-400 hover:text-slate-200"}`}
+      role="switch"
+      aria-checked={on}
+      className={`min-h-10 rounded-lg border px-2.5 py-1 text-xs transition ${on ? "border-cyan-300 bg-cyan-400/15 text-cyan-100" : "border-white/15 text-slate-400 hover:text-slate-200"}`}
     >
       {children}
     </button>
@@ -69,7 +71,7 @@ export function ControlPanel({ sim }: { sim: Sim }) {
   const shipAlive = START_AGE + bioYears(trip, sim.tau, sim.sleep) < sim.lifespan;
 
   return (
-    <section className="space-y-4">
+    <section className="control-panel space-y-4">
       {/* En pantallas chicas estos ajustes salen de la consola para no tapar las escenas: aquí siguen a mano. */}
       <div className="hidden space-y-3 rounded-xl border border-white/10 p-3 max-sm:block [@media(max-height:520px)]:block">
         <div className="hud-label text-cyan-300">Ajustes rápidos</div>

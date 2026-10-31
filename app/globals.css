@@ -103,3 +103,43 @@ input[type="range"] {
 .toon {
   shape-rendering: geometricPrecision;
 }
+
+/* Espacio seguro para las barras del navegador y los recortes de pantalla del teléfono. */
+.twins-theater {
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.modal-backdrop {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+@media (max-width: 639px) {
+  .scene-hud { max-width: calc(100% - 1rem); }
+  .mission-console button { touch-action: manipulation; }
+  .timeline::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: 5px; }
+  .timeline::-moz-range-thumb { width: 18px; height: 18px; }
+}
+/* En horizontal, cada escena conserva altura suficiente para ver al personaje entero. */
+@media (orientation: landscape) and (max-height: 520px) and (min-width: 640px) {
+  .twins-theater {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .scene-earth { grid-area: 1 / 1; }
+  .scene-ship { grid-area: 1 / 2; }
+  .mission-console { grid-area: 2 / 1 / 3 / 3; }
+  .scene-hud { max-width: min(19rem, calc(100% - 1rem)); padding: 0.4rem 0.6rem; }
+  .scene-hud .hud-label { font-size: 8px; }
+}
+@media (max-width: 639px), (pointer: coarse) {
+  .control-panel button { min-height: 40px; min-width: 40px; }
+}
+
+.mobile-mission-controls { display: none; }
+@media (max-width: 639px), (max-height: 520px) {
+  .desktop-mission-controls { display: none; }
+  .mobile-mission-controls { display: block; }
+  .mission-console { padding-top: 4px; padding-bottom: 4px; }
+  .mobile-mission-controls .timeline::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: 3px; }
+  .mobile-mission-controls .timeline::-moz-range-thumb { width: 18px; height: 18px; }
+}

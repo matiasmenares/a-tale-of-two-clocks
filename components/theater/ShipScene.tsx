@@ -5,6 +5,11 @@ import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { Gargantua } from "./Gargantua";
 import { RelativisticSky, type SkyProps } from "./RelativisticSky";
 import { useFocusView } from "./useFocusView";
+import { Ranger } from "./Ranger";
+import { ShipCompanions } from "./ShipCompanions";
+import { Tars } from "./Tars";
+import { Airlock } from "./Airlock";
+import { useId } from "react";
 
 const GROUND = 262;
 const W = 800;
@@ -73,8 +78,8 @@ function Gantry({ t, age, gestureT, waiting = false }: { t: number; age: number;
       <rect width={W} height="300" fill="url(#g-sky)" />
       {[0, 1].map((i) => (
         <g key={i} fill="#fff" opacity="0.75" transform={`translate(${((gestureT * 4 + i * 420) % 1000) - 200} ${60 + i * 50})`}>
-          <ellipse rx="46" ry="12" />
-          <ellipse cx="26" cy="-6" rx="26" ry="12" />
+          <path d="M-46 1 C-47 -8 -35 -13 -25 -10 C-21 -26 0 -28 10 -17 C23 -25 43 -19 43 -8 C59 -5 57 7 42 10 C18 16 -23 15 -39 9 Q-46 6 -46 1Z" />
+          <path d="M-42 5 Q0 16 46 4 Q54 0 53 -3 C60 8 40 13 18 14 Q-30 17 -42 5Z" fill="#829fbe" opacity="0.18" />
         </g>
       ))}
       <rect y="262" width={W} height="38" fill="#86a37a" />
@@ -151,7 +156,7 @@ function Cockpit({ props, shake }: { props: ShipSceneProps; shake: number }) {
   const burning = stage === "flight" || (stage === "cinematic" && cinematicTime > 13);
   const glow = burning ? Math.min(1, shake / 2 + 0.25) : 0;
   const alarm = countdown > 0 && countdown <= 10 && Math.floor(gestureT * 2) % 2 === 0;
-  const roll = Math.sin(gestureT * 3) * shake * 2;
+  const roll = Math.sin(gestureT * 3) * shake * 0.7;
   const fmtNum = (v: number, d = 1) => v.toLocaleString("es-CL", { maximumFractionDigits: d, minimumFractionDigits: d });
   const altText = altKm < 1 ? `${fmtNum(altKm * 1000, 0)} m` : `${fmtNum(altKm, altKm < 100 ? 2 : 0)} km`;
   const velText = speedKms < 1 ? `${fmtNum(speedKms * 1000, 1)} m/s` : `${fmtNum(speedKms, 3)} km/s`;
@@ -432,32 +437,69 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
     <>
       <defs>
         <linearGradient id="c-wall" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#475569" />
-          <stop offset="1" stopColor="#334155" />
+          <stop offset="0" stopColor="#526980" />
+          <stop offset="1" stopColor="#28384d" />
+        </linearGradient>
+        <linearGradient id="c-panel" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#62768c" />
+          <stop offset="1" stopColor="#3a4c62" />
+        </linearGradient>
+        <linearGradient id="c-floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#172638" />
+          <stop offset="1" stopColor="#34465b" />
+        </linearGradient>
+        <linearGradient id="c-metal" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#b3c6d1" /><stop offset="0.25" stopColor="#718b9d" /><stop offset="1" stopColor="#3b5268" />
         </linearGradient>
       </defs>
       <rect width={W} height="300" fill="url(#c-wall)" />
       {/* Paneles con remaches */}
       {Array.from({ length: 8 }, (_, i) => (
         <g key={i}>
-          <rect x={i * 100 + 5} y="16" width="90" height="226" rx="8" fill="#526178" stroke="#1e293b" />
+          <rect x={i * 100 + 5} y="16" width="90" height="226" rx="8" fill="url(#c-panel)" stroke="#1e293b" />
+          <path d={`M${i * 100 + 10} 232 V27 Q${i * 100 + 10} 21 ${i * 100 + 17} 21 H${i * 100 + 84}`} fill="none" stroke="#c9dfeb" strokeOpacity="0.18" strokeWidth="0.8" />
           {[24, 230].map((y) => [14, 82].map((dx) => <circle key={`${y}-${dx}`} cx={i * 100 + dx} cy={y} r="1.6" fill="#94a3b8" />))}
         </g>
       ))}
+      {/* Costillas estructurales e iluminación empotrada. */}
+      {[3, 198, 598, 797].map(x => <g key={`rib-${x}`}>
+        <path d={`M${x - 4} 16 L${x - 4} 242 L${x + 4} 252 L${x + 4} 16`} fill="#283c50" stroke="#172839" strokeWidth="0.8" />
+        <path d={`M${x - 2} 21 V239`} stroke="#9db4c3" strokeWidth="0.7" opacity="0.35" />
+      </g>)}
       {/* Tubería y franja de luz */}
       <rect x="0" y="6" width={W} height="7" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />
       <rect x="0" y="0" width={W} height="5" fill="#e0f2fe" opacity={0.6 * lights} />
+      {[50, 230, 430, 630].map(x => <g key={`lamp-${x}`}>
+        <rect x={x} y="17" width="100" height="6" rx="2" fill="#182c40" />
+        <rect x={x + 5} y="19" width="90" height="2" rx="1" fill="#d9edf3" opacity={0.7 * lights} />
+      </g>)}
       <path d="M0 250 H800" stroke="#64748b" strokeWidth="5" />
-      <rect y={GROUND} width={W} height="40" fill="#1e293b" />
+      <rect y={GROUND} width={W} height="40" fill="url(#c-floor)" />
+      <path d="M0 280 H800 M0 298 H800" fill="none" stroke="#a5c3d5" strokeOpacity="0.12" strokeWidth="0.7" />
+      {Array.from({ length: 11 }, (_, i) => <path key={`seam-${i}`} d={`M${i * 80} ${GROUND} L${400 + (i * 80 - 400) * 1.2} 300`} stroke="#a5c3d5" strokeOpacity="0.1" strokeWidth="0.7" />)}
       {Array.from({ length: 20 }, (_, i) => (
         <rect key={i} x={i * 40 + 2} y={GROUND + 4} width="36" height="6" fill="#334155" />
       ))}
       {/* Pasamanos */}
-      <path d="M220 150 h120" stroke={INK} strokeWidth="6.2" strokeLinecap="round" />
-      <path d="M220 150 h120" stroke="#fbbf24" strokeWidth="4" strokeLinecap="round" />
+      <g role="img" aria-label="Pasamanos para sujetarse y desplazarse en ingravidez">
+        <title>Pasamanos: Tomás puede sujetarse para moverse cuando no hay gravedad.</title>
+        <path d="M219 154 H341" stroke="#14293b" strokeWidth="5" opacity="0.25" />
+        {[220, 340].map(x => <g key={`handrail-${x}`}>
+          <rect x={x - 5} y="143" width="10" height="16" rx="2" fill="#334b60" stroke="#192c3e" strokeWidth="0.8" />
+          <path d={`M${x - 2} 145 h4 M${x - 2} 157 h4`} stroke="#9eb3bf" strokeWidth="0.7" />
+          <path d={`M${x} 153 v-3`} stroke="#b4c5cd" strokeWidth="3" />
+        </g>)}
+        <path d="M220 150 h120" stroke={INK} strokeWidth="6.2" strokeLinecap="round" />
+        <path d="M220 150 h120" stroke="#fbbf24" strokeWidth="4" strokeLinecap="round" />
+        <path d="M225 149 h110" stroke="#fff0ae" strokeWidth="0.6" opacity="0.65" />
+        <text x="280" y="166" textAnchor="middle" fontSize="4.6" fontFamily="monospace" letterSpacing="0.7" fill="#b8cbd5">PASAMANOS</text>
+      </g>
       {/* Huerto hidropónico */}
       <rect x="300" y="40" width="92" height="56" rx="6" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
       <rect x="300" y="40" width="92" height="56" rx="6" fill="#a855f7" opacity="0.18" />
+      <path d="M306 46 H386" stroke="#e6cafa" strokeWidth="2" opacity={0.6 * lights} />
+      <path d="M304 88 H388 V93 H304Z" fill="#50677b" stroke="#203446" strokeWidth="0.6" />
+      <path d="M309 91 H383" stroke="#91c5d6" strokeWidth="0.7" />
       {/* Cultivos en ciclos de ~90 días: crecen, amarillean un poco antes de la cosecha y vuelven a brotar */}
       {Array.from({ length: 6 }, (_, i) => {
         const g = ((props.years * 365.25) / 90 + i * 0.07) % 1;
@@ -503,6 +545,7 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       <circle cx="197" cy="75" r="8" fill="#f2c9a0" stroke={INK} strokeWidth="0.6" />
       <path d="M189 73 q8 -11 16 0" fill="#3a2618" stroke={INK} strokeWidth="0.7" />
       <rect x="187" y="85" width="20" height="18" rx="3" fill="#2563eb" stroke={INK} strokeWidth="0.7" />
+      <ShipCompanions t={gestureT} cryo={props.cryo} />
       {/* Ventana relativista: un clic la abre en grande */}
       <g onClick={props.onOpenWindow} role="button" aria-label="Mirar por la ventana" className="cursor-pointer">
         <title>Mirar por la ventana</title>
@@ -514,6 +557,8 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
         <ellipse cx="700" cy="114" rx="90" ry="80" fill="none" stroke="#cbd5e1" strokeWidth="10" className="transition hover:stroke-cyan-200" />
       </g>
       <ellipse cx="700" cy="114" rx="96" ry="86" fill="none" stroke={INK} strokeWidth="1.5" />
+      <ellipse cx="700" cy="114" rx="85" ry="75" fill="none" stroke="#112235" strokeWidth="2" opacity="0.7" pointerEvents="none" />
+      <path d="M634 72 A86 76 0 0 1 729 43" fill="none" stroke="#f0f9ff" strokeWidth="1.4" opacity="0.6" pointerEvents="none" />
       {Array.from({ length: 8 }, (_, i) => (
         <circle key={i} cx={700 + Math.cos((i * Math.PI) / 4) * 93} cy={114 + Math.sin((i * Math.PI) / 4) * 83} r="2.4" fill="#64748b" />
       ))}
@@ -521,16 +566,31 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
       <rect x="22" y={GROUND - 46} width="136" height="10" rx="3" fill="#64748b" stroke={INK} strokeWidth="1.6" />
       <rect x="22" y={GROUND - 36} width="136" height="36" fill="#475569" stroke={INK} strokeWidth="1.6" />
       <rect x="22" y={GROUND - 100} width="8" height="100" fill="#64748b" stroke={INK} strokeWidth="1.6" />
+      <rect x="31" y={GROUND - 51} width="120" height="5" rx="2.5" fill="#b4c3cd" stroke="#30465a" strokeWidth="0.7" />
+      <path d={`M32 ${GROUND - 52} q15 -7 28 0`} fill="#dde3df" stroke="#526779" strokeWidth="0.7" />
+      <path d={`M72 ${GROUND - 51} q34 -7 77 0`} fill="none" stroke="#d6905b" strokeWidth="3" />
+      {[40, 95].map(x => <g key={`locker-${x}`}>
+        <rect x={x} y={GROUND - 30} width="48" height="25" rx="2" fill="#364c61" stroke="#23364a" strokeWidth="0.7" />
+        <path d={`M${x + 3} ${GROUND - 27} h42 M${x + 18} ${GROUND - 23} h12`} stroke="#91a7b7" strokeWidth="0.8" />
+        <path d={`M${x + 8} ${GROUND - 11} h32`} stroke="#162b40" strokeWidth="1" strokeDasharray="2 2" />
+      </g>)}
       {/* Mesa plegable */}
       {!folded && <rect x="214" y={GROUND - 54} width="84" height="8" rx="2" fill="#cbd5e1" stroke={INK} strokeWidth="1.6" />}
       {!folded && <rect x="252" y={GROUND - 46} width="7" height="46" fill="#94a3b8" stroke={INK} strokeWidth="1.6" />}
+      {!folded && <path d={`M218 ${GROUND - 52} H294 M256 ${GROUND - 44} v40`} fill="none" stroke="#e1edf0" strokeWidth="0.8" opacity="0.7" />}
       {/* Cinta de correr con arnés */}
       <rect x="348" y={GROUND - 14} width="96" height="14" rx="4" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
+      <path d={`M356 ${GROUND - 12} H433 V${GROUND - 4} H356Z`} fill="#293a4b" stroke="#637d90" strokeWidth="0.7" />
+      {[363, 380, 397, 414].map(x => <path key={`belt-${x}`} d={`M${x} ${GROUND - 11} v6`} stroke="#8ba3b3" strokeWidth="0.6" opacity="0.4" />)}
       <path d="M432 248 L444 182" stroke={INK} strokeWidth="7.4" />
       <path d="M432 248 L444 182" stroke="#64748b" strokeWidth="5" />
       <rect x="436" y="176" width="20" height="10" rx="2" fill="#1e293b" stroke={INK} strokeWidth="1.4" />
       {/* Consola de navegación */}
-      <rect x="470" y={GROUND - 58} width="96" height="58" fill="#0f172a" stroke={INK} strokeWidth="1.6" />
+      <rect x="470" y={GROUND - 58} width="96" height="58" rx="3" fill="#243b50" stroke={INK} strokeWidth="1.4" />
+      <path d={`M473 ${GROUND - 56} H563 V${GROUND - 48} H473Z`} fill="url(#c-metal)" />
+      <path d={`M476 ${GROUND - 34} H560 M479 ${GROUND - 30} V${GROUND - 7} H557 V${GROUND - 30}`} fill="none" stroke="#536d81" strokeWidth="0.7" />
+      <path d={`M488 ${GROUND - 14} h58 M488 ${GROUND - 10} h58`} stroke="#10283c" strokeWidth="1.5" strokeDasharray="3 2" />
+      <path d={`M513 ${GROUND - 64} v6 M506 ${GROUND - 59} h25`} fill="none" stroke="#93a8b8" strokeWidth="2" />
       {/* La pantalla de navegación abre el mapa */}
       <g onClick={props.onOpenMap} role="button" aria-label="Abrir el mapa de navegación" className="cursor-pointer transition hover:brightness-150">
         <title>Abrir el mapa de navegación</title>
@@ -545,15 +605,17 @@ function CabinBackdrop({ props, lights = 1 }: { props: ShipSceneProps; lights?: 
         const h = (days % 1) * 24;
         const hh = String(Math.floor(h)).padStart(2, "0");
         const mm = String(Math.floor((h % 1) * 60)).padStart(2, "0");
+        const dayLabel = `DÍA ${Math.floor(days) + 1}`;
+        // Cada dato tiene su propia fila; el día conserva todos sus dígitos en viajes largos.
+        const dayFontSize = Math.min(6.5, 62 / (dayLabel.length * 0.62));
         return (
           <g onClick={props.onOpenClocks} role="button" aria-label="Comparar los relojes de los dos hermanos" className="cursor-pointer transition hover:brightness-150">
-            <title>Comparar los relojes de Tomás y Martín</title>
-            <rect x="482" y={GROUND - 140} width="72" height="20" rx="4" fill="#0b1120" stroke={INK} strokeWidth="1.6" />
-            <text x="487" y={GROUND - 126} fontSize="7" fill="#94a3b8" fontFamily="monospace">DÍA</text>
-            <text x="503" y={GROUND - 126} fontSize="8" fill="#fbbf24" fontFamily="monospace" fontWeight="bold">
-              {Math.floor(days) + 1}
+            <title>{`${dayLabel} · ${hh}:${mm} — Comparar los relojes de Tomás y Martín`}</title>
+            <rect x="482" y={GROUND - 145} width="72" height="25" rx="4" fill="#0b1120" stroke={INK} strokeWidth="1.6" />
+            <text x="518" y={GROUND - 135} fontSize={dayFontSize} fill="#fbbf24" fontFamily="monospace" fontWeight="bold" textAnchor="middle">
+              {dayLabel}
             </text>
-            <text x="550" y={GROUND - 126} fontSize="8" fill="#67e8f9" fontFamily="monospace" textAnchor="end">
+            <text x="518" y={GROUND - 124} fontSize="8" fill="#67e8f9" fontFamily="monospace" textAnchor="middle">
               {hh}:{mm}
             </text>
           </g>
@@ -843,13 +905,7 @@ function Miller({ props }: { props: ShipSceneProps }) {
         <path key={k} d={`M${((k * 110 + gestureT * 20) % 900) - 60} ${214 + (k % 4) * 14} q15 -4 30 0`} stroke="#cbd5e1" strokeWidth="1.2" fill="none" opacity="0.5" />
       ))}
       {/* La Ranger, posada en el agua */}
-      <g transform={`translate(150 ${GROUND - 8})`}>
-        <path d="M-72 -16 L-66 -40 L-50 -40 L-40 -32 L40 -32 L74 -20 L70 -14 L-72 -14Z" fill="#52525b" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M-66 -40 L-62 -58 L-52 -58 L-48 -40Z" fill="#3f3f46" stroke={INK} strokeWidth="1.2" />
-        <rect x="-14" y="-30" width="14" height="16" fill={inside ? "#fde68a" : "#18181b"} stroke={INK} strokeWidth="1.6" />
-        <rect x="-30" y="-27" width="60" height="2.5" fill="#f97316" opacity="0.85" />
-        <rect x="-80" y="-14" width="160" height="8" fill="#334155" opacity="0.6" />
-      </g>
+      <Ranger x={150} y={GROUND - 8} open={inside} water />
       {/* La ola gigante */}
       {waveH > 0 && (
         <path
@@ -860,6 +916,17 @@ function Miller({ props }: { props: ShipSceneProps }) {
           opacity="0.95"
         />
       )}
+      {p < 0.915 && <Tars
+        x={(() => {
+          const retreat = Math.max(0, Math.min(1, (p - 0.6) / 0.3));
+          const blend = retreat * retreat * (3 - 2 * retreat);
+          return (422 + Math.sin(gestureT * 0.2) * 90) * (1 - blend) + 162 * blend;
+        })()}
+        y={GROUND + 2}
+        t={gestureT}
+        running={running}
+        boarding={Math.max(0, Math.min(1, (p - 0.87) / 0.045))}
+      />}
       {alive && !inside && (
         <>
           <Person x={tx} y={GROUND + 4} age={age} pose="walk" t={walkClock(gestureT * (running ? 60 : 18), age)} facing={facing} outfit="spacesuit" helmet mood={running ? "effort" : "focused"} />
@@ -875,38 +942,56 @@ function Miller({ props }: { props: ShipSceneProps }) {
 
 /** Planeta o luna que domina el cielo. */
 function SkyBody({ parent }: { parent: PlanetInfo["parent"] }) {
-  if (parent === "mars")
-    return (
-      <g>
-        <circle cx="640" cy="54" r="9" fill="#fef3c7" opacity="0.9" />
-        <circle cx="640" cy="54" r="20" fill="#fef3c7" opacity="0.15" />
-        <ellipse cx="200" cy="70" rx="6" ry="4" fill="#78716c" />
-      </g>
-    );
-  if (parent === "jupiter")
-    return (
-      <g transform="translate(560 90)">
-        <circle r="78" fill="#d6a46a" />
-        {[-50, -28, -8, 14, 36, 56].map((y, i) => (
-          <rect key={y} x="-80" y={y} width="160" height={i % 2 ? 9 : 6} fill={i % 2 ? "#b45309" : "#fde68a"} opacity="0.55" />
-        ))}
-        <ellipse cx="26" cy="24" rx="14" ry="8" fill="#c2410c" opacity="0.8" />
-        <circle r="78" fill="none" stroke="#00000033" strokeWidth="20" />
-      </g>
-    );
-  if (parent === "saturn")
-    return (
-      <g transform="translate(560 80) rotate(-14)" opacity="0.75">
-        <ellipse rx="120" ry="20" fill="none" stroke="#fde68a" strokeWidth="10" />
-        <circle r="54" fill="#eab308" />
-        <path d="M-120 0 A120 20 0 0 0 120 0" fill="none" stroke="#fde68a" strokeWidth="10" />
-      </g>
-    );
+  const id = useId();
+  const jupiter = parent === "jupiter";
+  const saturn = parent === "saturn";
+  const r = jupiter ? 78 : saturn ? 54 : 60;
+  if (parent === "mars") return (
+    <g>
+      <circle cx="640" cy="54" r="23" fill="#fef3c7" opacity="0.07" />
+      <circle cx="640" cy="54" r="9" fill="#fff0c2" />
+      <ellipse cx="200" cy="70" rx="6" ry="4" fill="#78716c" />
+      <path d="M196 68 Q200 65 203 69" fill="none" stroke="#c2b7a5" strokeWidth="0.8" />
+    </g>
+  );
   return (
-    <g transform="translate(560 80)">
-      <circle r="60" fill="#3b82f6" />
-      <ellipse cx="-14" cy="-10" rx="22" ry="9" fill="#93c5fd" opacity="0.5" />
-      <circle r="60" fill="none" stroke="#1e3a8a" strokeOpacity="0.5" strokeWidth="14" />
+    <g transform={`translate(560 ${jupiter ? 90 : 80}) rotate(${saturn ? -14 : -8})`}>
+      <defs>
+        <clipPath id={`${id}-disc`}><circle r={r} /></clipPath>
+        <radialGradient id={`${id}-shade`} cx="30%" cy="25%" r="80%">
+          <stop offset="0" stopColor="#fff8de" stopOpacity="0.25" />
+          <stop offset="0.45" stopColor="#fff8de" stopOpacity="0" />
+          <stop offset="0.8" stopColor="#0b132b" stopOpacity="0.3" />
+          <stop offset="1" stopColor="#020617" stopOpacity="0.85" />
+        </radialGradient>
+      </defs>
+      {saturn && <>
+        <ellipse rx="116" ry="24" fill="none" stroke="#ccb995" strokeWidth="13" opacity="0.7" />
+        <ellipse rx="128" ry="28" fill="none" stroke="#eee0ba" strokeWidth="3" opacity="0.5" />
+        <ellipse rx="109" ry="22" fill="none" stroke="#fff2ce" strokeWidth="2" opacity="0.7" />
+      </>}
+      <circle r={r} fill={jupiter ? "#d8b38e" : saturn ? "#d6bf8d" : "#437bbd"} />
+      <g clipPath={`url(#${id}-disc)`}>
+        {(jupiter || saturn) ? [-60, -43, -27, -9, 8, 27, 45, 61].map((y, i) => (
+          <path key={y} d={`M-85 ${y} Q-35 ${y + 6} 0 ${y + 2} T85 ${y + 3}`} fill="none" stroke={i % 2 ? "#965e44" : "#fff1cb"} strokeWidth={saturn ? 4 : i % 2 ? 11 : 6} opacity={saturn ? 0.18 : 0.55} />
+        )) : <>
+          <path d="M-68 -21 Q-28 -8 8 -20 T70 -18 M-65 18 Q-8 29 33 18 T70 22" fill="none" stroke="#a5d4ef" strokeWidth="7" opacity="0.22" />
+          <ellipse cx="-14" cy="-10" rx="22" ry="7" fill="#b2ddf4" opacity="0.45" />
+          <ellipse cx="20" cy="29" rx="11" ry="4" fill="#163a75" opacity="0.4" />
+        </>}
+        {jupiter && <>
+          <ellipse cx="26" cy="24" rx="17" ry="9" fill="#eed0a2" />
+          <ellipse cx="26" cy="24" rx="13" ry="6" fill="#b96445" />
+          <path d="M16 24 Q26 18 35 24 Q26 28 22 24" fill="none" stroke="#e49d70" strokeWidth="1.2" />
+        </>}
+        <circle r={r} fill={`url(#${id}-shade)`} />
+      </g>
+      <circle r={r} fill="none" stroke={jupiter || saturn ? "#fbe2bd" : "#9dd7ff"} strokeOpacity="0.35" strokeWidth="0.8" />
+      {saturn && <>
+        <path d="M-116 0 A116 24 0 0 0 116 0" fill="none" stroke="#ccb995" strokeWidth="13" opacity="0.9" />
+        <path d="M-128 0 A128 28 0 0 0 128 0" fill="none" stroke="#eee0ba" strokeWidth="3" opacity="0.6" />
+        <path d="M-109 0 A109 22 0 0 0 109 0" fill="none" stroke="#fff2ce" strokeWidth="2" opacity="0.7" />
+      </>}
     </g>
   );
 }
@@ -947,15 +1032,7 @@ function Surface({ props }: { props: ShipSceneProps }) {
         <ellipse key={k} cx={180 + k * 32} cy={GROUND + 4 + (k % 2) * 3} rx="3.2" ry="1.4" fill="#00000030" />
       ))}
       {/* La Ranger aterrizada */}
-      <g transform={`translate(${0.78 * W} ${GROUND - 4})`}>
-        <ellipse cx="0" cy="2" rx="80" ry="5" fill="#00000040" />
-        <path d="M-40 -14 L-46 2 M38 -14 L44 2" stroke="#27272a" strokeWidth="3" />
-        <path d="M-72 -16 L-66 -40 L-50 -40 L-40 -32 L40 -32 L74 -20 L70 -14 L-72 -14Z" fill="#52525b" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M-66 -40 L-62 -58 L-52 -58 L-48 -40Z" fill="#3f3f46" stroke={INK} strokeWidth="1.2" />
-        <path d="M44 -31 L64 -24 L60 -22 L44 -27Z" fill={act.inside ? "#fde68a" : "#0f172a"} stroke="#a1a1aa" strokeWidth="0.7" />
-        <rect x="-30" y="-27" width="60" height="2.5" fill="#f97316" opacity="0.85" />
-        <rect x="-14" y="-30" width="14" height="16" fill={act.inside ? "#fde68a" : "#18181b"} stroke={INK} strokeWidth="1.6" />
-      </g>
+      <Ranger x={0.78 * W} y={GROUND - 4} open={act.inside} />
       {/* Bandera de la misión */}
       {flagUp && (
         <g transform={`translate(${0.62 * W + 14} ${GROUND})`}>
@@ -991,7 +1068,7 @@ function Surface({ props }: { props: ShipSceneProps }) {
   );
 }
 
-/** De vuelta en la Tierra: la cabina vacía con la escotilla abierta a la luz del día. */
+/** De vuelta en la Tierra: la esclusa de salida, separada de la cabina y su litera. */
 function Landed({ props }: { props: ShipSceneProps }) {
   const out = props.outside ?? { years: 0, deathYears: Infinity };
   const epoch = earthEpoch(out.years, out.deathYears).key;
@@ -1005,7 +1082,7 @@ function Landed({ props }: { props: ShipSceneProps }) {
   );
   return (
     <>
-      <CabinBackdrop props={props} lights={0.3} />
+      <Airlock sealed={sealed} />
       {/* Por la ventana redonda también se ve la Tierra de esa época */}
       <clipPath id="landed-window">
         <ellipse cx="700" cy="114" rx="86" ry="76" />
@@ -1045,7 +1122,7 @@ function Landed({ props }: { props: ShipSceneProps }) {
           <path d={`M40 ${GROUND} L150 ${GROUND} L210 290 L0 290Z`} fill={light} opacity="0.3" />
         </>
       )}
-      <text x="430" y="150" fontSize="15" textAnchor="middle" fill="#f8fafc" stroke="#020617" strokeWidth="3" paintOrder="stroke">
+      <text x="430" y="291" fontSize="10" textAnchor="middle" fill="#f8fafc" stroke="#020617" strokeWidth="2" paintOrder="stroke">
         {epoch === "whitedwarf"
           ? "No hay Tierra a la que bajar: el Sol es una enana blanca"
           : epoch === "redgiant"
@@ -1063,7 +1140,11 @@ export function ShipScene(props: ShipSceneProps) {
   const view = useFocusView(props.focusX ?? W / 2);
   const launchSeconds = years * 365.25 * 86_400;
   const inCockpit = (stage === "cinematic" && cinematicTime >= 6) || (stage === "flight" && launchSeconds < 3_600);
-  const shake = stage === "flight" ? Math.max(0, 3 * (1 - launchSeconds / 600)) : stage === "cinematic" && cinematicTime > 14 ? 1 : 0;
+  const shake = stage === "flight"
+    ? 1.1 * Math.exp(-launchSeconds / 50)
+    : stage === "cinematic"
+      ? Math.min(1, Math.max(0, (cinematicTime - 13) / 3)) * 1.1
+      : 0;
   return (
     <svg ref={view.ref} viewBox={view.viewBox} preserveAspectRatio="xMidYMax slice" className="toon absolute inset-0 h-full w-full">
       {stage === "boarding" ? (

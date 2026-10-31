@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { bioYears, NEVER, tauAtBio, type Sleep } from "@/lib/cryo";
 import { START_AGE } from "@/lib/derive";
+import { earthDeparture } from "@/lib/departure";
+import { boardingSpeed } from "@/lib/playback";
 import { buildTrip, DESTINATIONS, stateAt, tauFromT, type Destination, type TripParams } from "@/lib/relativity";
 
 export type Chapter = 1 | 2 | 3 | 4;
@@ -32,9 +34,15 @@ export function useSimulation() {
   const [stayK, setStayK] = useState(1.0001);
   const [stayYears, setStayYears] = useState(1);
   const [lifespan, setLifespan] = useState(90);
-  const [rate, setRate] = useState(0.5); // años del reloj maestro por segundo real
+  const [rate, setRateValue] = useState(0.5); // años del reloj maestro por segundo real
   const [master, setMaster] = useState<Master>("ship");
   const [director, setDirector] = useState(true);
+  // Un ajuste manual tiene prioridad sobre las cámaras lentas automáticas.
+  const setRate = useCallback((value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return;
+    setRateValue(value);
+    setDirector(false);
+  }, []);
   /** Tramos en que Tomás durmió en la cápsula criogénica (solo afecta al crucero). */
   const [sleep, setSleep] = useState<Sleep>(NEVER);
   const hypersleep = sleep.length > 0 && sleep[sleep.length - 1][1] === Infinity;
@@ -97,7 +105,7 @@ export function useSimulation() {
     const v = num("v");
     if (v !== null && v > START_AGE) setLifespan(v);
     const r = num("r");
-    if (r !== null && r > 0) setRate(r);
+    if (r !== null && r > 0) setRateValue(r);
     if (q.get("h") === "1") setSleep([[0, Infinity]]);
     const p = num("p");
     if (p !== null && p > 0) pendingProgress.current = Math.min(1, p);
@@ -171,6 +179,8 @@ export function useSimulation() {
         // Despegue casi en tiempo real que luego acelera exponencialmente; cámara lenta cerca de cada evento.
         // ~4 s de despegue en tiempo real; luego cada ~1,7 s el ritmo se multiplica por e.
         let cap = Math.max(SECOND, (tau - 4 * SECOND) * 0.6);
+        const departure = earthDeparture(s.t / SECOND, trip.params.accelG, trip.params.instant);
+        if (departure.setting === "return") cap = Math.min(cap, (departure.progress < 0.9 ? 300 : 45) * SECOND);
         for (const e of events) cap = Math.min(cap, Math.max(DAY * 3, Math.abs(tau - e) * 0.5));
         if (s.phase.kind === "stay" || s.phase.kind === "surface") cap = Math.min(cap, (s.phase.tau1 - s.phase.tau0) / 8);
         next = Math.min(next, tau + cap * dt);
@@ -194,24 +204,28 @@ export function useSimulation() {
     return () => cancelAnimationFrame(raf);
   }, [playing, stage]);
 
-  // Cinemática de embarque con el reloj real: sigue aunque la pestaña quede en segundo plano.
+  // Acumular el tiempo permite cambiar el ritmo sin reiniciar la secuencia ni saltar de posición.
   useEffect(() => {
     if (stage !== "cinematic" || !playing) return;
-    const start = performance.now() - cinematicRef.current * 1000;
-    const id = setInterval(() => {
-      const t = (performance.now() - start) / 1000;
+    let last = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const { rate, director } = live.current;
+      const t = cinematicRef.current + Math.max(0, (now - last) / 1000) * boardingSpeed(rate, director);
+      last = now;
       cinematicRef.current = t;
       if (t >= CINEMATIC_SECONDS) {
-        clearInterval(id);
         tauRef.current = 0;
         setTau(0);
         setCinematicTime(CINEMATIC_SECONDS);
         setStage("flight");
       } else {
         setCinematicTime(t);
+        frame = requestAnimationFrame(tick);
       }
-    }, 40);
-    return () => clearInterval(id);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [stage, playing]);
 
   /**
@@ -278,7 +292,7 @@ export function useSimulation() {
   /** Velocidad de reproducción de cada mitad: años propios por segundo real. */
   const dtdtau = ship.phase.kind === "stay" && stage === "flight" ? 1 / trip.stayRate : ship.gamma;
   const nominalShip = master === "ship" ? rate : rate / dtdtau;
-  const shipPlayback = stage === "cinematic" ? SECOND : playing && stage === "flight" ? shipSpeed || nominalShip : nominalShip;
+  const shipPlayback = stage === "cinematic" ? SECOND * boardingSpeed(rate, director) : playing && stage === "flight" ? shipSpeed || nominalShip : nominalShip;
   const earthPlayback = stage === "cinematic" ? SECOND : shipPlayback * dtdtau;
 
   return {

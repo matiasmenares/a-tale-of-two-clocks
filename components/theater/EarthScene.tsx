@@ -3,6 +3,15 @@ import { techAt } from "@/lib/tech";
 import { MusicNotes, Person, Sleeper, walkClock, type Mood } from "./Person";
 import { skyColors, STAR_POINTS } from "./sky";
 import { useFocusView } from "./useFocusView";
+import { Ranger } from "./Ranger";
+import { Cemetery, Headstone } from "./Cemetery";
+import { Tree } from "./Tree";
+import { FutureBuilding } from "./FutureBuilding";
+import { RedGiantLandscape } from "./RedGiantLandscape";
+import { DryOceanLandscape } from "./DryOceanLandscape";
+import { EnginePlume, LaunchSmoke } from "./LaunchEffects";
+import { ReturnHome } from "./ReturnHome";
+import { returnJourney } from "@/lib/departure";
 
 const GROUND = 262;
 const W = 800;
@@ -24,7 +33,8 @@ export interface EarthSceneProps {
   /** Reloj del robot: sigue el ritmo acelerado hasta ×40. */
   fastT: number;
   epoch: Epoch;
-  setting: "launch" | "home" | "after" | "reunion";
+  setting: "launch" | "return" | "home" | "after" | "reunion";
+  returnProgress?: number;
   stage: "boarding" | "cinematic" | "flight" | "done";
   cinematicTime: number;
   rocketAltitudeM: number;
@@ -87,9 +97,8 @@ function Sky({ hour, timelapse, ice = 0, id, weather, t = 0 }: { hour: number; t
         const shade = Math.round(255 - grey * 110 - (i % 2) * 12);
         return (
           <g key={i} fill={`rgb(${shade},${shade},${Math.min(255, shade + 6)})`} opacity={(0.85 - sky.night * 0.55) * (0.7 + w.clouds * 0.3)} transform={`translate(${cx} ${cy}) scale(${s})`}>
-            <ellipse cx="0" cy="0" rx="38" ry="11" />
-            <ellipse cx="20" cy="-6" rx="24" ry="12" />
-            <ellipse cx="-18" cy="-3" rx="20" ry="9" />
+            <path d="M-38 1 C-41 -6 -32 -12 -23 -10 C-21 -22 -4 -25 4 -16 C16 -24 33 -17 33 -8 C48 -6 47 5 35 9 C18 15 -14 13 -28 10 C-35 9 -38 6 -38 1Z" />
+            <path d="M-35 4 C-17 11 17 9 37 3 C44 0 44 -3 42 -5 C50 4 40 10 30 11 C7 16 -29 13 -35 4Z" fill="#617991" opacity="0.13" />
             {w.clouds > 0.6 && <ellipse cx="2" cy="6" rx="44" ry="9" opacity="0.8" />}
           </g>
         );
@@ -160,36 +169,7 @@ function City({ year, base, t, night }: { year: number; base: number; t: number;
               {Array.from({ length: Math.floor(h / 12) }, (_, r) => <rect key={r} x={x + 3} y={base - h + 6 + r * 12} width={w - 6} height="3" fill="#bae6fd" opacity={lit(i, r, 0) * 0.8} />)}
             </g>
           );
-        if (style === 2)
-          return (
-            <g key={i}>
-              <path d={`M${x} ${base} L${x + w * 0.15} ${base - h} Q${cx} ${base - h - 28} ${x + w * 0.85} ${base - h} L${x + w} ${base}Z`} fill="#334155" stroke="#0f172a" />
-              {Array.from({ length: Math.floor(h / 22) }, (_, r) => (
-                <g key={r}>
-                  <rect x={x + w * 0.18} y={base - h + 10 + r * 22} width={w * 0.64} height="3" fill="#67e8f9" opacity={lit(i, r, 1) + 0.2} />
-                  {r % 2 === 0 && <ellipse cx={x + w * 0.85} cy={base - h + 18 + r * 22} rx="6" ry="3" fill="#22c55e" />}
-                </g>
-              ))}
-            </g>
-          );
-        if (style === 3)
-          return (
-            <g key={i}>
-              <path d={`M${x + w * 0.1} ${base} L${x + w * 0.3} ${base - h * 1.25} L${x + w * 0.7} ${base - h * 1.25} L${x + w * 0.9} ${base}Z`} fill="#1e293b" stroke="#020617" />
-              {[0.3, 0.55, 0.8].map((f) => (
-                <ellipse key={f} cx={cx} cy={base - h * 1.25 * f} rx={w * 0.55} ry="4" fill="none" stroke="#a5f3fc" strokeWidth="2" opacity="0.8" />
-              ))}
-              {Array.from({ length: 5 }, (_, c) => <line key={c} x1={x + w * (0.32 + c * 0.09)} y1={base - h * 1.2} x2={x + w * (0.25 + c * 0.12)} y2={base} stroke="#4ade80" strokeWidth="2" opacity="0.6" />)}
-              <circle cx={cx} cy={base - h * 1.25 - 4} r="3" fill="#f0abfc" opacity={0.5 + 0.5 * Math.sin(t * 2 + i)} />
-            </g>
-          );
-        return (
-          <g key={i}>
-            <path d={`M${x - 6} ${base} A${w * 0.75} ${h * 0.9} 0 0 1 ${x + w + 6} ${base}Z`} fill="#0e7490" stroke="#083344" opacity="0.9" />
-            <path d={`M${x - 6} ${base} A${w * 0.75} ${h * 0.9} 0 0 1 ${x + w + 6} ${base}`} fill="none" stroke="#a5f3fc" strokeWidth="1.5" opacity={0.5 + 0.3 * Math.sin(t + i)} />
-            <ellipse cx={cx} cy={base - h * 0.45} rx={w * 0.35} ry={h * 0.2} fill="#22d3ee" opacity="0.25" />
-          </g>
-        );
+        return <FutureBuilding key={i} x={x} w={w} h={h} base={base} style={style} night={night} seed={i} />;
       })}
       {/* Tránsito según la época */}
       {lv < 2 &&
@@ -216,8 +196,21 @@ function City({ year, base, t, night }: { year: number; base: number; t: number;
         ))}
       {lv >= 3 && (
         <>
-          <path d={`M0 ${base - 180} Q${W / 2} ${base - 222} ${W} ${base - 180}`} stroke="#94a3b8" strokeWidth="3" fill="none" />
-          <rect x={((t * 80) % (W + 120)) - 120} y={base - 203} width="110" height="9" rx="4" fill="#f8fafc" stroke={INK} strokeWidth="0.8" />
+          <path d={`M0 ${base - 180} Q${W / 2} ${base - 222} ${W} ${base - 180}`} stroke="#536e82" strokeWidth="4" fill="none" />
+          <path d={`M0 ${base - 182} Q${W / 2} ${base - 224} ${W} ${base - 182}`} stroke="#bed5dd" strokeWidth="1" fill="none" />
+          {(() => {
+            const tx = ((t * 80) % (W + 120)) - 60;
+            const u = tx / W;
+            const ty = base - 180 - 84 * u * (1 - u);
+            const angle = Math.atan((-84 + 168 * u) / W) * 180 / Math.PI;
+            return <g transform={`translate(${tx} ${ty - 7}) rotate(${angle})`}>
+              <path d="M-48 -5 H37 Q49 -5 55 3 L50 6 H-48 Q-55 6 -55 0 Q-55 -5 -48 -5Z" fill="#d6e3e7" stroke="#294359" strokeWidth="0.8" />
+              <path d="M-46 -3 H35 L43 1 H-47Z" fill="#31566c" />
+              {[-30, -12, 6, 24].map(v => <path key={v} d={`M${v} -3 v4`} stroke="#9fc3ce" strokeWidth="0.7" />)}
+              <path d="M-49 4 H44" stroke="#d49b57" strokeWidth="1" />
+              <path d="M-36 7 h12 M24 7 h12" stroke="#77deec" strokeWidth="1.5" />
+            </g>;
+          })()}
         </>
       )}
       {lv >= 4 && <line x1={W * 0.7} y1={base} x2={W * 0.72} y2="0" stroke="#e0f2fe" strokeWidth="2" opacity="0.5" />}
@@ -230,7 +223,7 @@ function City({ year, base, t, night }: { year: number; base: number; t: number;
  * referencia, cinco motores y la nave Ranger (oscura, con alas delta) en la punta.
  * El origen (0, 0) es la base de las toberas; mide ~228 unidades de alto.
  */
-function Rocket({ x, y, scale, flame }: { x: number; y: number; scale: number; flame: number }) {
+function Rocket({ x, y, scale, flame, t }: { x: number; y: number; scale: number; flame: number; t: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
       <defs>
@@ -245,13 +238,7 @@ function Rocket({ x, y, scale, flame }: { x: number; y: number; scale: number; f
           <stop offset="1" stopColor="#18181b" />
         </linearGradient>
       </defs>
-      {flame > 0 && (
-        <g opacity={flame}>
-          <ellipse cx="0" cy="44" rx="26" ry="48" fill="#f97316" opacity="0.9" />
-          <ellipse cx="0" cy="30" rx="17" ry="32" fill="#fde047" />
-          <ellipse cx="0" cy="16" rx="9" ry="17" fill="#fff7ed" />
-        </g>
-      )}
+      {flame > 0 && <EnginePlume t={t} power={flame} />}
       {/* Toberas y estructura de empuje */}
       {[-14, 0, 14].map((ex) => (
         <path key={ex} d={`M${ex - 3.5} -10 L${ex + 3.5} -10 L${ex + 6} 0 L${ex - 6} 0Z`} fill="#3f3f46" stroke={INK} strokeWidth="1" />
@@ -276,6 +263,9 @@ function Rocket({ x, y, scale, flame }: { x: number; y: number; scale: number; f
       {/* Nave Ranger: fuselaje anguloso, alas delta, cabina */}
       <path d="M-24 -179 L-8 -196 L-6 -214 L0 -228 L6 -214 L8 -196 L24 -179Z" fill="url(#ranger)" stroke={INK} strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M-8 -196 L8 -196 M-16 -186 L16 -186 M0 -228 L0 -196" stroke="#71717a" strokeWidth="0.8" />
+      <path d="M-22 -180 L-6 -196 L-4 -214 L0 -225 L-1 -202 L-11 -182Z" fill="#b1c4d2" opacity="0.25" />
+      <path d="M3 -202 L17 -182 L8 -184 L0 -195Z" fill="#101d2e" />
+      <path d="M-11 -187 L-4 -195 M4 -195 L11 -187" stroke="#b3c6cf" strokeWidth="0.6" />
       <path d="M-4 -214 L0 -222 L4 -214 L3 -208 L-3 -208Z" fill="#0f172a" stroke="#a1a1aa" strokeWidth="0.6" />
       <path d="M-1 -219 L1 -216" stroke="#67e8f9" strokeWidth="1" />
       <rect x="-20" y="-182" width="40" height="3" fill="#f97316" opacity="0.85" />
@@ -285,44 +275,25 @@ function Rocket({ x, y, scale, flame }: { x: number; y: number; scale: number; f
 
 /** La Ranger aterrizada en horizontal, con la escotilla abierta y la rampa abajo. */
 function RangerLanded({ x, y }: { x: number; y: number }) {
-  return (
-    <g transform={`translate(${x} ${y})`}>
-      <defs>
-        <linearGradient id="ranger-side" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#71717a" />
-          <stop offset="0.5" stopColor="#3f3f46" />
-          <stop offset="1" stopColor="#18181b" />
-        </linearGradient>
-      </defs>
-      <ellipse cx="0" cy="0" rx="80" ry="5" fill="#00000040" />
-      {/* Tren de aterrizaje */}
-      <path d="M-40 -14 L-46 0 M-42 0 h-8 M38 -14 L44 0 M40 0 h8" stroke="#27272a" strokeWidth="3" />
-      {/* Fuselaje con nariz en cuña y cola */}
-      <path d="M-72 -16 L-66 -40 L-50 -40 L-40 -32 L40 -32 L74 -20 L70 -14 L-72 -14Z" fill="url(#ranger-side)" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M-66 -40 L-62 -58 L-52 -58 L-48 -40Z" fill="#3f3f46" stroke={INK} strokeWidth="1.2" />
-      <path d="M44 -31 L64 -24 L60 -22 L44 -27Z" fill="#0f172a" stroke="#a1a1aa" strokeWidth="0.7" />
-      <path d="M-40 -32 L40 -32 M-30 -22 L50 -22" stroke="#a1a1aa" strokeWidth="0.6" opacity="0.6" />
-      <rect x="-30" y="-27" width="60" height="2.5" fill="#f97316" opacity="0.85" />
-      <text x="0" y="-17" fontSize="6" textAnchor="middle" fill="#e4e4e7" letterSpacing="1">RANGER · TERRA-1</text>
-      {/* Escotilla abierta y rampa */}
-      <rect x="-14" y="-30" width="14" height="16" fill="#fde68a" opacity="0.9" stroke={INK} strokeWidth="1.6" />
-      <path d="M-14 -14 L-30 0 L-14 0Z" fill="#52525b" stroke={INK} strokeWidth="1" />
-    </g>
-  );
+  return <Ranger x={x} y={y} open />;
 }
 
 function LaunchSite({ props }: { props: EarthSceneProps }) {
   const { stage, cinematicTime, rocketAltitudeM, gestureT, age, years, hour } = props;
   const lifted = stage === "flight" || stage === "done";
-  const rise = lifted ? 150 * Math.log10(1 + rocketAltitudeM / 20) : 0;
+  const rise = lifted ? 110 * Math.log10(1 + rocketAltitudeM / 35) : 0;
+  const cameraY = Math.min(230, Math.max(0, rise - 32) * 0.8);
+  const launchSeconds = years * 365.25 * 86_400;
+  const exhaustTime = stage === "cinematic" ? Math.max(0, cinematicTime - 13) : lifted ? 3 + launchSeconds : 0;
+  const enginePower = lifted ? 1 : Math.min(1, exhaustTime / 2.7);
   const scale = Math.max(0.12, 1 - Math.log10(1 + rocketAltitudeM / 200) / 4);
-  const shake = lifted && rocketAltitudeM < 2000 ? Math.sin(gestureT * 40) * 1.2 : 0;
-  const ignition = stage === "cinematic" && cinematicTime > 13;
+  const shake = Math.sin(exhaustTime * 43) * enginePower * Math.max(0, 1 - rocketAltitudeM / 2500) * 0.6;
   const pose = stage === "cinematic" && cinematicTime < 7 ? "wave" : lifted && years < 0.002 ? "lookUp" : "stand";
   const night = skyColors(hour, false).night;
   return (
     <>
       <Sky hour={hour} timelapse={props.timelapse} id="launch" />
+      <g transform={`translate(0 ${cameraY})`}>
       {/* Montañas y ciudad lejanas: sólidas, con bruma por la distancia */}
       <path d="M0 200 L90 150 L170 190 L280 130 L380 190 L470 160 L560 200 L800 170 V262 H0Z" fill="#8193ab" />
       <path d="M90 150 L104 158 L80 160Z M280 130 L298 142 L264 142Z M470 160 L482 167 L460 168Z" fill="#e2e8f0" />
@@ -375,21 +346,16 @@ function LaunchSite({ props }: { props: EarthSceneProps }) {
         <line x1="689" y1="14" x2="689" y2="-6" strokeWidth="2" />
         {!lifted && (
           <>
-            <path d="M676 96 L640 96" strokeWidth="5" />
-            <path d="M676 150 L648 150" strokeWidth="4" />
-            <path d="M676 205 L650 205" strokeWidth="4" />
+            <path d="M676 96 L640 96" strokeWidth="5" transform={`rotate(${Math.min(1, Math.max(0, (cinematicTime - 11) / 2)) * 75} 676 96)`} />
+            <path d="M676 150 L648 150" strokeWidth="4" transform={`rotate(${Math.min(1, Math.max(0, (cinematicTime - 11) / 2)) * 75} 676 150)`} />
+            <path d="M676 205 L650 205" strokeWidth="4" transform={`rotate(${Math.min(1, Math.max(0, (cinematicTime - 11) / 2)) * 75} 676 205)`} />
           </>
         )}
       </g>
-      <Rocket x={632 + shake} y={250 - rise} scale={scale * 0.82} flame={lifted ? 1 : ignition ? 0.35 : 0} />
-      {(lifted && rocketAltitudeM < 60_000) || ignition ? (
-        <g opacity="0.75">
-          {Array.from({ length: 9 }, (_, i) => (
-            <circle key={i} cx={588 + i * 11 + Math.sin(gestureT + i) * 4} cy={GROUND - 12 - (i % 3) * 8} r={16 + (i % 3) * 7} fill="#e5e7eb" />
-          ))}
-          {lifted && <path d={`M632 ${GROUND - 20} Q${626 + Math.sin(gestureT) * 6} ${(250 - rise + GROUND) / 2} 632 ${250 - rise + 20 * scale}`} stroke="#f1f5f9" strokeWidth={18 * Math.max(0.3, scale)} fill="none" opacity="0.7" strokeLinecap="round" />}
-        </g>
-      ) : null}
+      <LaunchSmoke elapsed={exhaustTime} altitude={rocketAltitudeM} />
+      {enginePower > 0 && <ellipse cx="632" cy="250" rx={34 + enginePower * 28} ry="12" fill="#ffce7a" opacity={enginePower * Math.max(0, 1 - rocketAltitudeM / 200) * 0.4} />}
+      <Rocket x={632 + shake} y={250 - rise} scale={scale * 0.82} flame={enginePower} t={exhaustTime} />
+      <LaunchSmoke elapsed={exhaustTime} altitude={rocketAltitudeM} front />
       {/* Reja y público */}
       <g stroke="#57534e" strokeWidth="2">
         <line x1="0" y1={GROUND - 22} x2="440" y2={GROUND - 22} />
@@ -404,6 +370,7 @@ function LaunchSite({ props }: { props: EarthSceneProps }) {
       <path d={`M150 ${GROUND - 90} l26 6 l-26 6Z`} fill="#2563eb" stroke={INK} strokeWidth="1.6" />
       <Person x={210} y={GROUND} age={age} pose={pose} t={gestureT} />
       <text x="210" y={GROUND + 26} fontSize="12" fill="#f8fafc" textAnchor="middle" fontWeight="600">{EARTH_NAME}</text>
+      </g>
     </>
   );
 }
@@ -497,6 +464,22 @@ function Home({ props }: { props: EarthSceneProps }) {
   return (
     <>
       <defs>
+        <linearGradient id="home-wall-light" x1="0" y1="0" x2="0.8" y2="1">
+          <stop stopColor="#fff3d9" stopOpacity="0.2" />
+          <stop offset="0.55" stopColor="#714e36" stopOpacity="0" />
+          <stop offset="1" stopColor="#463227" stopOpacity="0.22" />
+        </linearGradient>
+        <linearGradient id="home-wood" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#b68b5f" /><stop offset="0.35" stopColor="#866044" /><stop offset="1" stopColor="#584332" />
+        </linearGradient>
+        <linearGradient id="home-fabric" x1="0" y1="0" x2="1" y2="1">
+          <stop stopColor="#ba6861" /><stop offset="1" stopColor="#713e40" />
+        </linearGradient>
+        <radialGradient id="home-lamp" gradientUnits="userSpaceOnUse" cx="340" cy="50" r="190">
+          <stop stopColor="#ffe6a4" stopOpacity="0.7" />
+          <stop offset="0.45" stopColor="#ffe6a4" stopOpacity="0.2" />
+          <stop offset="1" stopColor="#ffe6a4" stopOpacity="0" />
+        </radialGradient>
         <pattern id="wallpaper" width="26" height="26" patternUnits="userSpaceOnUse">
           <rect width="26" height="26" fill={wall} />
           <path d="M13 4 l3 5 l-3 5 l-3 -5Z" fill="#00000012" />
@@ -506,12 +489,19 @@ function Home({ props }: { props: EarthSceneProps }) {
           <line x1="0" y1="0" x2="80" y2="0" stroke="#6b4423" strokeWidth="2" />
           <line x1="40" y1="0" x2="40" y2="20" stroke="#6b4423" />
           <line x1="10" y1="20" x2="10" y2="40" stroke="#6b4423" />
+          <path d="M4 6 Q23 3 37 6 T76 6 M16 28 Q35 25 70 28 M47 14 h25 M4 35 h23" fill="none" stroke="#c29a6c" strokeWidth="0.6" opacity="0.3" />
         </pattern>
       </defs>
       <rect width={W} height={GROUND} fill="url(#wallpaper)" />
-      <rect y={GROUND - 10} width={W} height="10" fill="#f5f5f4" stroke={INK} strokeWidth="0.8" />
+      <rect width={W} height={GROUND} fill="url(#home-wall-light)" />
+      <path d="M0 242 H800" stroke="#694e39" strokeWidth="1" opacity="0.2" />
+      <rect y={GROUND - 10} width={W} height="10" fill="#d8cbb4" stroke="#594c3d" strokeWidth="0.7" />
+      <path d="M0 253 H800" stroke="#fff0d4" strokeWidth="1.4" />
       <rect y={GROUND} width={W} height="40" fill="url(#planks)" />
-      <ellipse cx="360" cy={GROUND + 14} rx="150" ry="12" fill="#9f1239" opacity="0.55" />
+      <ellipse cx="360" cy={GROUND + 16} rx="151" ry="12" fill="#302523" opacity="0.18" />
+      <ellipse cx="360" cy={GROUND + 13} rx="148" ry="11" fill="#975459" />
+      <ellipse cx="360" cy={GROUND + 13} rx="137" ry="8" fill="none" stroke="#d5a17b" strokeWidth="0.8" opacity="0.65" />
+      <path d={`M225 ${GROUND + 13} H495`} stroke="#d5a17b" strokeWidth="0.5" strokeDasharray="1 4" opacity="0.4" />
 
       {/* Ventana: cielo y ciudad reales de ese año */}
       <svg x="596" y="34" width="160" height="128" viewBox="150 0 500 300" preserveAspectRatio="xMidYMid slice">
@@ -535,12 +525,18 @@ function Home({ props }: { props: EarthSceneProps }) {
       <line x1="676" y1="34" x2="676" y2="162" stroke="#fafaf9" strokeWidth="4" />
       <rect x="592.5" y="30.5" width="167" height="135" fill="none" stroke={INK} strokeWidth="1.4" />
       <rect x="599.5" y="37.5" width="153" height="121" fill="none" stroke={INK} strokeWidth="0.9" opacity="0.6" />
+      <path d="M605 42 L634 42 L605 104Z M685 42 L713 42 L685 103Z" fill="#f0f7ed" opacity="0.08" pointerEvents="none" />
+      <path d="M588 163 H763 L767 169 H584Z" fill="#c4b59b" stroke="#4b453b" strokeWidth="0.9" />
+      <path d="M587 165 H764" stroke="#fff0d5" strokeWidth="1" />
       <path d="M582 28 q14 70 4 142 l-8 0 q-6 -70 0 -142Z" fill="#b45309" stroke={INK} strokeWidth="1.6" />
       <path d="M770 28 q-14 70 -4 142 l8 0 q6 -70 0 -142Z" fill="#b45309" stroke={INK} strokeWidth="1.6" />
+      <path d="M582 34 q8 72 0 128 M772 34 q-8 72 0 128" fill="none" stroke="#f2b670" strokeWidth="1.4" opacity="0.55" />
       <rect x="576" y="22" width="206" height="8" rx="3" fill="#57534e" stroke={INK} strokeWidth="1.4" />
 
       {/* Biblioteca: los libros cambian de orden cada semana, hay más con los años y falta el que lee */}
-      <rect x="378" y="70" width="96" height="120" fill="#6b4423" stroke={INK} strokeWidth="1.6" />
+      <rect x="378" y="70" width="96" height="120" rx="2" fill="url(#home-wood)" stroke={INK} strokeWidth="1.3" />
+      <rect x="382" y="74" width="88" height="112" fill="#503c2d" />
+      <path d="M381 72 H471 M380 73 V187" stroke="#d6b48a" strokeWidth="0.8" opacity="0.7" />
       {[0, 1, 2].map((r) => {
         const week = Math.floor(cal.dayIndex / 7);
         const count = Math.min(9, 5 + Math.floor(years / 6) + r);
@@ -554,6 +550,7 @@ function Home({ props }: { props: EarthSceneProps }) {
               const tall = 24 + Math.floor(hash(pick + r) * 7);
               const lean = b === count - 1 && hash(week + r) > 0.5;
               return (
+                <g key={b} transform={lean ? `rotate(10 ${388 + b * 9.5} ${108 + r * 38})` : undefined}>
                 <rect
                   key={b}
                   x={384 + b * 9.5}
@@ -563,8 +560,9 @@ function Home({ props }: { props: EarthSceneProps }) {
                   fill={["#be123c", "#1d4ed8", "#15803d", "#a16207", "#7c3aed", "#0f766e", "#ea580c"][pick]}
                   stroke={INK}
                   strokeWidth="0.5"
-                  transform={lean ? `rotate(14 ${392 + b * 9.5} ${108 + r * 38})` : undefined}
                 />
+                <path d={`M${386 + b * 9.5} ${111 + r * 38 - tall} v${tall - 6} M${387 + b * 9.5} ${116 + r * 38 - tall} h3`} stroke="#f6dfb2" strokeWidth="0.55" opacity="0.5" />
+                </g>
               );
             })}
           </g>
@@ -615,19 +613,23 @@ function Home({ props }: { props: EarthSceneProps }) {
       {/* Lámpara */}
       <line x1="340" y1="0" x2="340" y2="34" stroke="#44403c" strokeWidth="2" />
       <path d="M322 50 L358 50 L350 34 L330 34Z" fill="#fef3c7" stroke={INK} strokeWidth="1.6" />
-      {lamp > 0.4 && <ellipse cx="340" cy="140" rx="140" ry="110" fill="#fde68a" opacity={lamp * 0.13} pointerEvents="none" />}
+      {lamp > 0.4 && <rect width={W} height={GROUND} fill="url(#home-lamp)" opacity={lamp * 0.35} pointerEvents="none" />}
 
       {/* Cama */}
       <rect x="34" y={GROUND - 76} width="12" height="76" rx="3" fill="#7c4a24" stroke={INK} strokeWidth="1.6" />
       <rect x="170" y={GROUND - 44} width="10" height="44" rx="3" fill="#7c4a24" stroke={INK} strokeWidth="1.6" />
       <rect x="44" y={GROUND - 40} width="130" height="20" rx="4" fill="#f8fafc" stroke={INK} strokeWidth="1.6" />
-      <rect x="40" y={GROUND - 22} width="138" height="16" fill="#92400e" stroke={INK} strokeWidth="1.6" />
+      <rect x="40" y={GROUND - 22} width="138" height="16" fill="url(#home-wood)" stroke={INK} strokeWidth="1.3" />
+      <path d={`M46 ${GROUND - 19} H171 M46 ${GROUND - 9} H171`} stroke="#d3ae7e" strokeWidth="0.7" opacity="0.6" />
+      <ellipse cx="65" cy={GROUND - 42} rx="17" ry="4" fill="#eee9d9" stroke="#9d9c96" strokeWidth="0.7" />
       {!asleep && !ghosts && <path d={`M80 ${GROUND - 40} q40 -8 92 0 l0 18 l-92 0Z`} fill="#3b82f6" stroke={INK} strokeWidth="1.6" />}
+      {!asleep && !ghosts && <path d={`M88 ${GROUND - 40} v16 M95 ${GROUND - 42} q27 4 63 0 M164 ${GROUND - 38} l-2 13`} fill="none" stroke="#bfdbfe" strokeWidth="0.8" opacity="0.5" />}
 
       {party && <Balloons x={334} base={GROUND - 54} t={gestureT} />}
 
       {/* Mesa */}
-      <rect x="244" y={GROUND - 54} width="96" height="8" rx="2" fill="#a16207" stroke={INK} strokeWidth="1.6" />
+      <rect x="244" y={GROUND - 54} width="96" height="8" rx="2" fill="url(#home-wood)" stroke={INK} strokeWidth="1.3" />
+      <path d={`M248 ${GROUND - 52} H336`} stroke="#dfbc88" strokeWidth="0.8" />
       <rect x="286" y={GROUND - 46} width="9" height="46" fill="#854d0e" stroke={INK} strokeWidth="1.6" />
       <ellipse cx="300" cy={GROUND - 57} rx="11" ry="3" fill="#f8fafc" stroke={INK} strokeWidth="1.6" />
       <rect x="318" y={GROUND - 66} width="8" height="11" rx="1.5" fill="#f87171" stroke={INK} strokeWidth="1.6" />
@@ -653,6 +655,9 @@ function Home({ props }: { props: EarthSceneProps }) {
       <rect x="446" y={GROUND - 56} width="112" height="8" rx="2" fill="#57534e" stroke={INK} strokeWidth="1.6" />
       <rect x="540" y={GROUND - 48} width="10" height="48" fill="#44403c" stroke={INK} strokeWidth="1.6" />
       <rect x="452" y={GROUND - 48} width="10" height="48" fill="#44403c" stroke={INK} strokeWidth="1.6" />
+      <path d={`M449 ${GROUND - 54} H554`} stroke="#b3a28b" strokeWidth="0.8" />
+      <path d={`M477 ${GROUND - 58} h39 l3 3 h-45Z`} fill="#b3b0a7" stroke="#494a46" strokeWidth="0.6" />
+      <path d={`M480 ${GROUND - 57} h33`} stroke="#515a5e" strokeWidth="0.7" strokeDasharray="2 1" />
       <DeskScreen
         kind={tech.screen}
         mode={asleep || ghosts ? (sky.night > 0.6 && !timelapse ? "off" : ghosts ? "work" : "idle") : act?.label.includes("mensaje") ? "call" : act?.label === "Jugando en el PC" && !act.walkingFrom ? "game" : act?.pose === "type" ? "work" : sky.night > 0.6 ? "off" : "idle"}
@@ -692,9 +697,10 @@ function Home({ props }: { props: EarthSceneProps }) {
       )}
       {/* Sillón de lectura frente a la biblioteca */}
       <g stroke={INK} strokeWidth="1">
-        <rect x="336" y={GROUND - 80} width="16" height="80" rx="6" fill="#991b1b" />
-        <rect x="340" y={GROUND - 34} width="58" height="16" rx="5" fill="#b91c1c" />
-        <rect x="392" y={GROUND - 46} width="10" height="46" rx="4" fill="#991b1b" />
+        <rect x="336" y={GROUND - 80} width="16" height="80" rx="6" fill="url(#home-fabric)" />
+        <rect x="340" y={GROUND - 34} width="58" height="16" rx="5" fill="url(#home-fabric)" />
+        <rect x="392" y={GROUND - 46} width="10" height="46" rx="4" fill="url(#home-fabric)" />
+        <path d={`M340 ${GROUND - 72} v37 M346 ${GROUND - 30} h42 M396 ${GROUND - 40} v29`} stroke="#e0a39a" strokeWidth="0.7" opacity="0.6" fill="none" />
         <rect x="344" y={GROUND - 18} width="6" height="18" fill="#451a03" />
       </g>
       {/* Sillas */}
@@ -979,29 +985,8 @@ function Visitor({ gestureT, age, color }: { gestureT: number; age: number; colo
 }
 
 /** Árbol que cambia con la estación: hojas verdes, otoñales que caen, ramas desnudas con nieve o flores. */
-function SeasonTree({ x, base, scale = 1, season: ss, t }: { x: number; base: number; scale?: number; season: Season; t: number }) {
-  const canopy = ss === "verano" ? "#15803d" : ss === "otoño" ? "#ea580c" : ss === "primavera" ? "#4ade80" : "none";
-  return (
-    <g transform={`translate(${x} ${base}) scale(${scale})`}>
-      <path d="M0 0 q-2 -20 0 -40 M0 -26 l-12 -12 M0 -32 l10 -10 M0 -38 l-6 -10" stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" />
-      <path d="M0 0 q-2 -20 0 -40 M0 -26 l-12 -12 M0 -32 l10 -10 M0 -38 l-6 -10" stroke="#4a3220" strokeWidth="4" fill="none" strokeLinecap="round" />
-      {canopy !== "none" && (
-        <>
-          <circle cx="0" cy="-48" r="18" fill={canopy} stroke={INK} strokeWidth="0.8" />
-          <circle cx="-12" cy="-40" r="12" fill={canopy} stroke={INK} strokeWidth="0.8" />
-          <circle cx="12" cy="-41" r="12" fill={canopy} stroke={INK} strokeWidth="0.8" />
-        </>
-      )}
-      {ss === "primavera" &&
-        Array.from({ length: 12 }, (_, k) => <circle key={k} cx={(hash(k) - 0.5) * 36} cy={-36 - hash(k + 5) * 26} r="2.2" fill="#f9a8d4" />)}
-      {ss === "otoño" &&
-        Array.from({ length: 6 }, (_, k) => {
-          const f = (t * 0.25 + hash(k)) % 1;
-          return <ellipse key={k} cx={(hash(k + 2) - 0.5) * 40 + Math.sin(t * 2 + k) * 6} cy={-36 + f * 38} rx="2.4" ry="1.4" fill={k % 2 ? "#f59e0b" : "#b45309"} opacity={1 - f * 0.5} />;
-        })}
-      {ss === "invierno" && <path d="M-12 -38 l4 -1 M10 -42 l4 -1 M-6 -48 l4 -1" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />}
-    </g>
-  );
+function SeasonTree({ x, base, scale = 1, season, t }: { x: number; base: number; scale?: number; season: Season; t: number }) {
+  return <Tree x={x} base={base} scale={scale} season={season} t={t} />;
 }
 
 /** Mishi, el gato: duerme en la cama, se sube al sillón, mira por la ventana o pasea. */
@@ -1291,8 +1276,6 @@ function Grave({ since, deathYears, gestureT, timelapse, extraVisitor }: { since
   const decay = Math.min(1, Math.max(0, (since - 10) / 60));
   const freshFlowers = funeral ? 6 : Math.round(5 * visitP);
   const deadFlowers = since >= 10 && since < 16 ? 3 : 0;
-  const stone = `rgb(${Math.round(150 - decay * 55)},${Math.round(146 - decay * 50)},${Math.round(140 - decay * 50)})`;
-  const tilt = decay * 11;
   const deathYear = LAUNCH_YEAR + Math.floor(deathYears);
   const visitors = [
     { age: 60, color: "#4c1d95" },
@@ -1323,53 +1306,24 @@ function Grave({ since, deathYears, gestureT, timelapse, extraVisitor }: { since
           <line key={i} x1={i * 20} y1={GROUND - 68} x2={i * 20} y2={GROUND - 38} />
         ))}
       </g>
-      {/* Otras tumbas, delante de la reja */}
-      {[90, 170, 560, 650, 730].map((x, i) => (
-        <g key={i}>
-          <ellipse cx={x + 12} cy={GROUND - 7} rx="16" ry="3" fill="#00000030" />
-          <path d={`M${x} ${GROUND - 8} v-34 q0 -12 12 -12 q12 0 12 12 v34Z`} fill="#a8a29e" stroke={INK} strokeWidth="1" />
-          <path d={`M${x + 12} ${GROUND - 44} v12 M${x + 7} ${GROUND - 39} h10`} stroke="#57534e" strokeWidth="1.5" />
-        </g>
-      ))}
-      {/* Árbol que crece */}
-      <path d={`M600 ${GROUND - 4} q-4 -60 4 -120`} stroke="#4a3220" strokeWidth={10 + Math.min(10, since / 8)} fill="none" />
-      {(() => {
-        const ss = season(calendar(deathYears + since).dayOfYear);
-        const leaf = ss === "verano" ? ["#166534", "#15803d"] : ss === "otoño" ? ["#c2410c", "#ea580c"] : ss === "primavera" ? ["#16a34a", "#4ade80"] : null;
-        return leaf ? (
-          <>
-            <circle cx="604" cy={GROUND - 130} r={34 + Math.min(30, since / 3)} fill={leaf[0]} stroke={INK} strokeWidth="1.6" />
-            <circle cx="574" cy={GROUND - 110} r={22 + Math.min(18, since / 5)} fill={leaf[1]} stroke={INK} strokeWidth="1.6" />
-            {ss === "primavera" && Array.from({ length: 14 }, (_, k) => <circle key={k} cx={574 + hash(k) * 64} cy={GROUND - 160 + hash(k + 3) * 70} r="2.4" fill="#f9a8d4" />)}
-          </>
-        ) : (
-          <path d={`M604 ${GROUND - 110} l-26 -30 M604 ${GROUND - 118} l22 -34 M604 ${GROUND - 124} l-6 -36`} stroke="#4a3220" strokeWidth="5" strokeLinecap="round" />
-        );
-      })()}
+      {/* Nuevos entierros y desgaste individual de cada lápida. */}
+      <Cemetery since={since} />
+      {/* El árbol gana altura y copa conservando ramas y follaje de la estación. */}
+      <Tree x={600} base={GROUND - 4} scale={1.8 + Math.min(0.8, since / 100)} season={season(calendar(deathYears + since).dayOfYear)} t={gestureT} />
 
-      {/* La tumba */}
-      <g transform={`rotate(${tilt} 380 ${GROUND - 4})`}>
-        <path d={`M352 ${GROUND - 4} v-64 q0 -22 28 -22 q28 0 28 22 v64Z`} fill={stone} stroke={INK} strokeWidth="1.4" />
-        <g opacity={1 - decay * 0.8} fill="#292524" textAnchor="middle">
-          <text x="380" y={GROUND - 60} fontSize="10" fontWeight="bold">{EARTH_NAME}</text>
-          <text x="380" y={GROUND - 46} fontSize="8">2000 – {deathYear}</text>
+      {/* Martín envejece con el mismo desgaste que las otras lápidas. */}
+      <Headstone x={380} y={GROUND - 4} age={since}>
+        <g fill="#292524" textAnchor="middle">
+          <text x="0" y="-56" fontSize="10" fontWeight="bold">{EARTH_NAME}</text>
+          <text x="0" y="-42" fontSize="8">2000 – {deathYear}</text>
           {decay < 0.6 && (
-            <text x="380" y={GROUND - 33} fontSize="6" fontStyle="italic">
-              <tspan x="380">Hermano</tspan>
-              <tspan x="380" dy="7">que esperó</tspan>
+            <text x="0" y="-29" fontSize="6" fontStyle="italic">
+              <tspan x="0">Hermano</tspan>
+              <tspan x="0" dy="7">que esperó</tspan>
             </text>
           )}
         </g>
-        {decay > 0.35 && <path d={`M372 ${GROUND - 88} l6 14 l-5 8 l7 16`} stroke="#292524" strokeWidth="1.2" fill="none" />}
-        {decay > 0.15 && (
-          <g fill="#4d7c0f" opacity={decay}>
-            <ellipse cx="360" cy={GROUND - 10} rx={8 + decay * 8} ry="5" />
-            <ellipse cx="398" cy={GROUND - 72} rx={4 + decay * 6} ry="3" />
-            <ellipse cx="366" cy={GROUND - 80} rx={3 + decay * 5} ry="2.5" />
-          </g>
-        )}
-      </g>
-      <rect x="342" y={GROUND - 6} width="76" height="8" fill="#78716c" stroke={INK} strokeWidth="1.6" />
+      </Headstone>
 
       {/* Flores frescas y marchitas */}
       {Array.from({ length: freshFlowers }, (_, i) => (
@@ -1551,133 +1505,8 @@ function SolarFate({ epoch, years, gestureT, idp = "sf" }: { epoch: Epoch["key"]
       </>
     );
   }
-  if (epoch === "boiled") {
-    // Más de mil millones de años: los océanos se evaporaron. Lecho marino seco, salinas y ruinas bajo un Sol enorme.
-    const grow = Math.min(1, (years - 1e9) / 3.5e9);
-    const R = 46 + grow * 34;
-    const spin = gestureT * 2;
-    return (
-      <>
-        <defs>
-          <linearGradient id={id("sky")} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#7c2d12" />
-            <stop offset="0.45" stopColor="#ea580c" />
-            <stop offset="1" stopColor="#fdba74" />
-          </linearGradient>
-          <radialGradient id={id("sun")}>
-            <stop offset="0" stopColor="#fffbeb" />
-            <stop offset="0.3" stopColor="#fef3c7" />
-            <stop offset="0.55" stopColor="#fdba74" stopOpacity="0.6" />
-            <stop offset="1" stopColor="#fb923c" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id={id("seabed")} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#b45309" />
-            <stop offset="1" stopColor="#7c2d12" />
-          </linearGradient>
-          <pattern id={id("cracks")} width="34" height="20" patternUnits="userSpaceOnUse">
-            <path d="M0 10 L8 2 L24 2 L34 10 L24 18 L8 18Z" fill="none" stroke="#a16207" strokeWidth="1" opacity="0.55" />
-          </pattern>
-        </defs>
-        <rect width={W} height="300" fill={`url(#${id("sky")})`} />
-        {/* Sol grande con corona que gira despacio */}
-        <circle cx="560" cy="86" r={R * 3} fill={`url(#${id("sun")})`} />
-        <g transform={`rotate(${spin} 560 86)`} opacity="0.35">
-          {Array.from({ length: 12 }, (_, k) => {
-            const a = (k / 12) * Math.PI * 2;
-            return <path key={k} d={`M${560 + Math.cos(a) * R * 1.1} ${86 + Math.sin(a) * R * 1.1} L${560 + Math.cos(a + 0.06) * R * 1.9} ${86 + Math.sin(a + 0.06) * R * 1.9} L${560 + Math.cos(a + 0.12) * R * 1.1} ${86 + Math.sin(a + 0.12) * R * 1.1}Z`} fill="#fef3c7" />;
-          })}
-        </g>
-        <circle cx="560" cy="86" r={R} fill="#fff7e0" stroke="#fde68a" strokeWidth="3" />
-        {/* Antiguas costas: acantilados en planos con calima */}
-        <path d="M0 176 L90 150 L150 170 L250 132 L330 168 L430 146 L520 174 L640 140 L730 166 L800 150 V262 H0Z" fill="#c2410c" opacity="0.55" />
-        <path d="M0 198 L70 180 L120 194 L200 168 L290 196 L380 178 L470 200 L560 176 L650 198 L740 182 L800 196 V262 H0Z" fill="#9a3412" stroke={INK} strokeWidth="1.2" strokeOpacity="0.5" />
-        {/* Lecho marino seco con salinas de grietas hexagonales */}
-        <path d={`M0 ${GROUND - 30} Q200 ${GROUND - 44} 400 ${GROUND - 32} T800 ${GROUND - 28} V300 H0Z`} fill={`url(#${id("seabed")})`} stroke={INK} strokeWidth="1.6" />
-        <ellipse cx="420" cy={GROUND + 12} rx="260" ry="20" fill="#fef3c7" opacity="0.85" stroke="#fde68a" strokeWidth="1.5" />
-        <ellipse cx="420" cy={GROUND + 12} rx="260" ry="20" fill={`url(#${id("cracks")})`} />
-        {/* Casco de un barco varado y el esqueleto de una cúpula: lo último de la civilización */}
-        <g transform={`translate(130 ${GROUND - 14})`}>
-          <path d="M-46 0 Q-40 -26 0 -28 L46 -24 L54 0Z" fill="#57534e" stroke={INK} strokeWidth="1.6" />
-          <path d="M-30 -22 L-28 0 M-10 -27 L-9 0 M10 -27 L10 0 M30 -25 L31 0" stroke="#292524" strokeWidth="1.4" />
-          <rect x="-6" y="-46" width="5" height="20" fill="#44403c" stroke={INK} strokeWidth="1.2" transform="rotate(12 -3 -26)" />
-        </g>
-        <g transform={`translate(700 ${GROUND - 22})`} fill="none" stroke={INK} strokeWidth="2.4">
-          <path d="M-56 0 A56 46 0 0 1 56 0" stroke="#78716c" strokeWidth="5" strokeDasharray="70 24 40 200" />
-          <path d="M-56 0 A56 46 0 0 1 56 0" strokeDasharray="70 24 40 200" />
-          <path d="M-28 0 Q-30 -36 0 -46 M28 0 Q30 -36 0 -46 M0 0 V-46" stroke="#57534e" strokeWidth="2" />
-        </g>
-        {/* Polvo y calima */}
-        {Array.from({ length: 24 }, (_, k) => {
-          const x = (hash(k) * 800 + gestureT * (10 + (k % 4) * 4)) % 820 - 10;
-          return <circle key={k} cx={x} cy={170 + hash(k + 2) * 100} r={0.8 + (k % 3) * 0.5} fill="#fed7aa" opacity="0.5" />;
-        })}
-        {[0, 1].map((k) => (
-          <path key={k} d={`M0 ${210 + k * 18 + Math.sin(gestureT * 2 + k) * 2} Q400 ${204 + k * 18} 800 ${210 + k * 18}`} stroke="#fff7ed" strokeWidth="6" fill="none" opacity="0.12" />
-        ))}
-      </>
-    );
-  }
-  if (epoch === "redgiant") {
-    // El Sol, gigante roja, ocupa medio cielo: la corteza se derrite y brillan ríos de lava.
-    const pulse = Math.sin(gestureT * 0.5);
-    return (
-      <>
-        <defs>
-          <linearGradient id={id("sky")} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#1c0505" />
-            <stop offset="1" stopColor="#7f1d1d" />
-          </linearGradient>
-          <radialGradient id={id("giant")} cx="0.5" cy="0.5" r="0.5">
-            <stop offset="0" stopColor="#fdba74" />
-            <stop offset="0.55" stopColor="#f97316" />
-            <stop offset="0.85" stopColor="#dc2626" />
-            <stop offset="1" stopColor="#7f1d1d" />
-          </radialGradient>
-          <radialGradient id={id("halo")}>
-            <stop offset="0.7" stopColor="#ef4444" stopOpacity="0.5" />
-            <stop offset="1" stopColor="#ef4444" stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id={id("crust")} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#292524" />
-            <stop offset="1" stopColor="#0c0a09" />
-          </linearGradient>
-        </defs>
-        <rect width={W} height="300" fill={`url(#${id("sky")})`} />
-        <circle cx="400" cy="70" r={330 + pulse * 6} fill={`url(#${id("halo")})`} />
-        <circle cx="400" cy="70" r={270 + pulse * 5} fill={`url(#${id("giant")})`} />
-        {/* Granulación: enormes celdas de convección que hierven despacio */}
-        {Array.from({ length: 18 }, (_, k) => {
-          const a = hash(k) * Math.PI * 2;
-          const r = Math.sqrt(hash(k + 7)) * 230;
-          const s = 14 + hash(k + 3) * 26 + Math.sin(gestureT * 0.4 + k) * 4;
-          return <ellipse key={k} cx={400 + Math.cos(a) * r} cy={70 + Math.sin(a) * r * 0.9} rx={s} ry={s * 0.8} fill={k % 3 ? "#fb923c" : "#b91c1c"} opacity="0.3" />;
-        })}
-        {/* Corteza negra en placas con grietas incandescentes */}
-        <path d={`M0 ${GROUND - 34} L120 ${GROUND - 46} L210 ${GROUND - 36} L330 ${GROUND - 52} L460 ${GROUND - 38} L580 ${GROUND - 48} L700 ${GROUND - 36} L800 ${GROUND - 44} V300 H0Z`} fill={`url(#${id("crust")})`} stroke={INK} strokeWidth="1.6" />
-        {Array.from({ length: 8 }, (_, k) => {
-          // Grietas que se ramifican entre las placas de roca.
-          const x = 30 + k * 100 + hash(k) * 30;
-          const y = GROUND - 34 + (k % 2) * 6;
-          const d = `M${x} ${y} C${x + 12} ${y + 10} ${x - 8} ${y + 22} ${x + 6} ${y + 34} S${x + 30} ${y + 50} ${x + 24} ${y + 62} M${x + 2} ${y + 24} C${x - 14} ${y + 30} ${x - 24} ${y + 34} ${x - 34} ${y + 44}`;
-          const glow = 0.6 + 0.4 * Math.sin(gestureT * 1.5 + k);
-          return (
-            <g key={k}>
-              <path d={d} stroke="#f97316" strokeWidth="7" fill="none" opacity={0.25 * glow} />
-              <path d={d} stroke="#fde047" strokeWidth="2" fill="none" opacity={glow} />
-            </g>
-          );
-        })}
-        {/* Río de lava en primer plano */}
-        <path d={`M0 ${GROUND + 18} Q200 ${GROUND + 4} 400 ${GROUND + 16} T800 ${GROUND + 10}`} stroke="#ea580c" strokeWidth="16" fill="none" />
-        <path d={`M0 ${GROUND + 18} Q200 ${GROUND + 4} 400 ${GROUND + 16} T800 ${GROUND + 10}`} stroke="#fde047" strokeWidth="4" fill="none" strokeDasharray="30 18" strokeDashoffset={-gestureT * 12} opacity="0.85" />
-        {/* Brasas que suben */}
-        {Array.from({ length: 26 }, (_, k) => {
-          const f = (gestureT * (0.15 + (k % 5) * 0.04) + hash(k)) % 1;
-          return <circle key={k} cx={hash(k + 1) * 800 + Math.sin(gestureT + k) * 8} cy={GROUND + 10 - f * 180} r={1 + (k % 3) * 0.6} fill="#fdba74" opacity={1 - f} />;
-        })}
-      </>
-    );
-  }
+  if (epoch === "boiled") return <DryOceanLandscape years={years} t={gestureT} />;
+  if (epoch === "redgiant") return <RedGiantLandscape t={gestureT} />;
   // Enana blanca: la Tierra ya no existe. Queda la nebulosa planetaria del Sol muerto, y en el fondo
   // la galaxia elíptica que formaron la Vía Láctea y Andrómeda.
   const turn = gestureT * 1.5;
@@ -1867,6 +1696,16 @@ export function EarthScene(props: EarthSceneProps) {
       </defs>
       {props.setting === "launch" ? (
         <LaunchSite props={props} />
+      ) : props.setting === "return" ? (
+        <>
+          <Sky hour={props.hour} timelapse={props.timelapse} id="return-sky" />
+          <g transform={`translate(${-((returnJourney(props.returnProgress ?? 0).cameraX * 0.16) % 800)} 0)`}>
+            {[0, 800].map(x => <g key={x} transform={`translate(${x} 0)`}>
+              <City year={LAUNCH_YEAR} base={225} t={props.gestureT} night={skyColors(props.hour, props.timelapse).night} />
+            </g>)}
+          </g>
+          <ReturnHome progress={props.returnProgress ?? 0} age={props.age} t={props.gestureT} />
+        </>
       ) : props.setting === "home" ? (
         <Home props={props} />
       ) : props.setting === "reunion" ? (

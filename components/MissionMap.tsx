@@ -36,7 +36,7 @@ function ZoomableMap({ sim, flying }: { sim: Sim; flying: boolean }) {
 
   // El mapa es cuadrado y se ajusta al lado más corto del recuadro.
   const unitsPerPx = () => (224 / shown.zoom) / Math.min(box.current?.clientWidth || 1, box.current?.clientHeight || 1);
-  const btn = "grid h-8 min-w-8 place-items-center rounded-full border border-white/15 bg-slate-900/80 px-2 text-sm text-slate-100 backdrop-blur transition hover:border-cyan-300/60";
+  const btn = "grid h-11 min-w-11 place-items-center rounded-full border border-white/15 bg-slate-900/80 px-2 text-sm text-slate-100 backdrop-blur transition hover:border-cyan-300/60 sm:h-8 sm:min-w-8";
   return (
     <div className="relative h-[min(62vh,620px)] min-h-[300px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#020617]">
       <div

@@ -85,13 +85,12 @@ function InstrumentBody({ inst, t }: { inst: Instrument; t: number }) {
   if (inst.kind === "guitar") {
     return (
       <g transform={`translate(${inst.at[0]} ${inst.at[1]}) rotate(${inst.angle}) scale(${GUITAR})`}>
-        {/* Cuerpo en forma de 8: contorno primero, relleno encima para fundir las dos curvas */}
-        <ellipse cx="-2" cy="0" rx="10.5" ry="9" fill="#d97706" stroke={INK} strokeWidth="1.5" />
-        <ellipse cx="9" cy="0" rx="7.5" ry="7" fill="#d97706" stroke={INK} strokeWidth="1.5" />
-        <ellipse cx="-2" cy="0" rx="9.75" ry="8.25" fill="#d97706" />
-        <ellipse cx="9" cy="0" rx="6.75" ry="6.25" fill="#d97706" />
+        {/* Una sola silueta continua: cintura suave, sin uniones entre elipses. */}
+        <path d="M14 -3 C18 -9 9 -11 4 -7 C0 -5 -2 -10 -7 -8 C-16 -5 -15 6 -7 9 C-2 11 1 5 5 7 C11 11 18 7 14 3Z" fill="#c87927" stroke={INK} strokeWidth="1.3" />
+        <path d="M12 -4 C15 -8 9 -9 5 -5 C0 -3 -3 -8 -7 -6 C-12 -4 -12 4 -7 6" fill="none" stroke="#fcd689" strokeWidth="0.65" />
         <ellipse cx="-3" cy="-3" rx="6" ry="3" fill="#fbbf24" opacity="0.35" />
-        <circle cx="6" cy="0" r="2.8" fill="#3b1d06" stroke="#78350f" strokeWidth="0.6" />
+        <circle cx="6" cy="0" r="3.5" fill="#f3c677" stroke="#78350f" strokeWidth="0.5" />
+        <circle cx="6" cy="0" r="2.6" fill="#3b1d06" />
         <rect x="-8" y="-3" width="2.2" height="6" rx="0.6" fill="#451a03" />
         {/* Mástil, trastes y clavijero */}
         <rect x="14" y="-1.7" width="22" height="3.4" fill="#78350f" stroke={INK} strokeWidth="1" />
@@ -375,11 +374,21 @@ export interface PersonProps {
 
 /** Cápsula con contorno (extremidad). */
 function Limb({ pts, color, w }: { pts: [number, number][]; color: string; w: number }) {
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join("");
+  // Redondear solo la articulación conserva las manos y los pies en su punto de anclaje.
+  const point = (p: [number, number]) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`;
+  let d = `M${point(pts[0])}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const before: [number, number] = [p[0] + (pts[i - 1][0] - p[0]) * 0.16, p[1] + (pts[i - 1][1] - p[1]) * 0.16];
+    const after: [number, number] = [p[0] + (pts[i + 1][0] - p[0]) * 0.16, p[1] + (pts[i + 1][1] - p[1]) * 0.16];
+    d += ` L${point(before)} Q${point(p)} ${point(after)}`;
+  }
+  d += ` L${point(pts[pts.length - 1])}`;
   return (
     <>
-      <path d={d} fill="none" stroke={INK} strokeWidth={w + 2.8} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={INK} strokeWidth={w + 2.2} strokeLinecap="round" strokeLinejoin="round" />
       <path d={d} fill="none" stroke={color} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" />
+      {w >= 7 && <path d={d} fill="none" stroke="#fff" strokeOpacity="0.1" strokeWidth={w * 0.24} strokeLinecap="round" transform="translate(-1 -0.6)" />}
     </>
   );
 }
@@ -463,7 +472,7 @@ export function Person({
   const P2 = [shX + nx * (half + 1), shY + ny * (half + 1)];
   const P3 = [shX - nx * (half + 1), shY - ny * (half + 1)];
   const mid = [(0 + shX) / 2 + nx * (half + belly), (hipY + shY) / 2 + ny * (half + belly)];
-  const torso = `M${P0[0]} ${P0[1]} L${P1[0]} ${P1[1]} Q${mid[0]} ${mid[1]} ${P2[0]} ${P2[1]} Q${shX + ux * 4} ${shY + uy * 4} ${P3[0]} ${P3[1]} Z`;
+  const torso = `M${P0[0]} ${P0[1]} Q0 ${hipY + 2} ${P1[0]} ${P1[1]} Q${mid[0]} ${mid[1]} ${P2[0]} ${P2[1]} Q${shX + ux * 4} ${shY + uy * 4} ${P3[0]} ${P3[1]} Q${shX * 0.35 - nx * (half + 1)} ${hipY * 0.65 + shY * 0.35} ${P0[0]} ${P0[1]}Z`;
 
   const skinDark = "#c98f6b";
   const brow = L.hair;
@@ -477,7 +486,9 @@ export function Person({
       <circle cx={aR.h[0]} cy={aR.h[1]} r="3.4" fill={outfit === "spacesuit" ? "#cbd5e1" : skinDark} stroke={INK} strokeWidth="1.3" />
 
       {/* Torso y ropa */}
-      <path d={torso} fill={P.top} stroke={INK} strokeWidth="1.7" strokeLinejoin="round" />
+      <path d={torso} fill={P.top} stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d={`M${P3[0] + nx * 2.5} ${P3[1] + 4} Q${shX * 0.4 - nx * 5} ${hipY * 0.6 + shY * 0.4} ${P0[0] + nx * 3} ${P0[1] - 3}`} fill="none" stroke={P.topDark} strokeWidth="3" opacity="0.5" />
+      <path d={`M${P0[0] + nx * 2} ${P0[1] - 3} Q0 ${hipY - 1} ${P1[0] - nx * 2} ${P1[1] - 3}`} fill="none" stroke={P.topDark} strokeWidth="0.8" />
       {outfit === "casual" && age >= 58 && (
         <path d={`M${shX + nx * 2} ${shY + ny * 2} L${(shX * 0.4) + nx * 6} ${(hipY * 0.4 + shY * 0.6) + ny * 6}`} stroke={P.sleeve} strokeWidth="4" />
       )}
@@ -514,6 +525,7 @@ export function Person({
         {/* Nariz, oreja, ojo, ceja, boca */}
         <path d={`M${hx + HEAD - 1.5} ${hy - 2} q4 3.5 0.5 5.5`} fill={L.skin} stroke={INK} strokeWidth="1.1" />
         <ellipse cx={hx - 2.5} cy={hy + 1} rx="2.6" ry="3.4" fill={L.skin} stroke={INK} strokeWidth="1" />
+        <path d={`M${hx - 3.4} ${hy + 2} q-0.8 -3 1.5 -2`} fill="none" stroke={skinDark} strokeWidth="0.7" />
         <Face hx={hx} hy={hy} mood={mood ?? (pose === "mourn" || pose === "kneel" ? "sad" : "neutral")} brow={brow} browWidth={1.4 + L.wrinkles * 0.6} t={t} />
         <circle cx={hx + 6} cy={hy + 3} r="1.8" fill="#f87171" opacity={0.25 * (1 - L.wrinkles)} />
         {/* Pelo: volumen en la nuca y coronilla; con la edad se retira */}

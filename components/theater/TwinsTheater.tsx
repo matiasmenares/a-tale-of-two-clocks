@@ -13,8 +13,10 @@ import { arrivalTau, earthToShip, shipToEarth } from "@/lib/comms";
 import { bioYears, inCryo, tauAtBio } from "@/lib/cryo";
 import { dopplerOf, fuel, headlineFor, inbox, shield } from "@/lib/voyage";
 import { EarthScene } from "./EarthScene";
+import { earthDeparture, returnJourney } from "@/lib/departure";
 import { ShipScene } from "./ShipScene";
 import { shipSky } from "./shipSky";
+import { MobileMissionControls } from "./MobileMissionControls";
 import { useSoundscape } from "./useSoundscape";
 
 const SEC_PER_YEAR = 365.25 * 86_400;
@@ -73,7 +75,7 @@ function SpeedBadge({ self, other, otherName }: { self: number; other: number; o
 function Hud({ children, className = "", accent }: { children: ReactNode; className?: string; accent?: "cyan" | "amber" }) {
   return (
     <div
-      className={`pointer-events-none absolute overflow-hidden rounded-2xl border border-white/10 bg-[#030712]/60 px-2.5 py-1.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-3.5 sm:py-2.5 ${className}`}
+      className={`scene-hud pointer-events-none absolute overflow-hidden rounded-2xl border border-white/10 bg-[#030712]/60 px-2.5 py-1.5 shadow-[0_10px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-md sm:px-3.5 sm:py-2.5 ${className}`}
     >
       {accent && (
         <div
@@ -87,7 +89,7 @@ function Hud({ children, className = "", accent }: { children: ReactNode; classN
 
 /** Barra segmentada de la consola: varios controles en una sola pastilla con divisiones. */
 const SEGMENTS = "flex items-center overflow-hidden rounded-full border border-white/10 bg-white/[0.04] divide-x divide-white/10";
-const SEG = "flex h-7 items-center gap-1.5 px-2.5 text-slate-200";
+const SEG = "flex h-7 items-center gap-1.5 px-2.5 text-slate-200 max-sm:min-h-10 max-sm:min-w-10 max-sm:justify-center";
 
 /** Lo que se esconde en pantallas chicas (celular vertical o apaisado) para no tapar las escenas. */
 const SECONDARY = "max-sm:hidden [@media(max-height:520px)]:hidden";
@@ -191,6 +193,18 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const { stage, ship, trip, lifespan, destination, cinematicTime } = sim;
   const [copied, setCopied] = useState(false);
   const [sound, setSound] = useState(false);
+  const [summaryDismissed, setSummaryDismissed] = useState(false);
+  useEffect(() => {
+    if (stage !== "done") {
+      setSummaryDismissed(false);
+      return;
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSummaryDismissed(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [stage]);
   const clocks = useGestureClocks(sim.earthPlayback, sim.shipPlayback, (stage === "flight" || stage === "cinematic") && !sim.playing);
   const flying = stage === "flight" || stage === "done";
 
@@ -211,7 +225,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const epoch = earthEpoch(earthYears, deathYears);
   const reunion = stage === "done" && sim.roundTrip;
 
-  const earthSetting = !flying ? "launch" : reunion ? "reunion" : earthYears < 2 / 365.25 ? "launch" : earthAlive ? "home" : "after";
+  const departure = earthDeparture(earthYears * SEC_PER_YEAR, trip.params.accelG, trip.params.instant);
+  const earthSetting = !flying ? "launch" : reunion ? "reunion" : earthAlive ? departure.setting : "after";
   const earthAct = earthAlive ? activityAt("earth", earthYears, earthAge) : null;
   const shipAct = shipAlive ? activityAt("ship", shipYears, shipAge) : null;
 
@@ -320,6 +335,8 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
       ? stage === "boarding"
         ? 260
         : 600
+      : earthSetting === "return"
+        ? returnJourney(departure.progress).carX
       : earthSetting === "home"
         ? earthAct
           ? earthAct.pose === "walk" && earthAct.walkingFrom === undefined
@@ -349,9 +366,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
   const progress = trip.totalTau > 0 ? Math.min(1, shipYears / trip.totalTau) : 0;
 
   return (
-    <section className="relative flex h-[100svh] flex-col overflow-hidden bg-black [@media(min-height:520px)]:min-h-[560px]">
+    <section className="twins-theater relative flex h-[100svh] flex-col overflow-hidden bg-black">
       {/* ── Mitad superior: la Tierra ── */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="scene-earth relative min-h-0 flex-1 overflow-hidden">
         <EarthScene
           years={earthYears}
           age={earthAge}
@@ -361,6 +378,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           fastT={clocks.earthFast}
           epoch={epoch}
           setting={earthSetting}
+          returnProgress={departure.progress}
           stage={stage}
           cinematicTime={cinematicTime}
           rocketAltitudeM={flying ? ship.x * LY_KM * 1000 : 0}
@@ -382,6 +400,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           </div>
           <div className="text-xs text-slate-300 sm:text-sm">
             <span className="font-mono text-cyan-200">{epoch.title}</span>
+            {earthSetting === "return" && <span> · {departure.label}</span>}
             {flying && earthAlive && earthSetting === "home" && (
               <>
                 {" "}· {SEASON_ICON[ss]} {ss}
@@ -420,7 +439,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
           )}
           {flying && <div className={`mt-1.5 ${SECONDARY}`}><SpeedBadge self={sim.earthPlayback} other={sim.shipPlayback} otherName={SHIP_NAME} /></div>}
         </Hud>
-        {flying && stage !== "done" && earthAlive && (
+        {flying && stage !== "done" && earthAlive && earthSetting === "home" && (
           <Hud className={`bottom-3 right-3 hidden max-w-xs text-xs text-slate-300 sm:block ${SECONDARY}`}>
             <div className="hud-label mb-0.5 text-slate-400">Telescopio · clic en él para mirar</div>
             Ve a {SHIP_NAME} con <b className="text-amber-300">{formatAge(START_AGE + d.shipSeenFromEarth)}</b>
@@ -436,31 +455,33 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
       </div>
 
       {/* ── Consola central de misión ── */}
-      <div className="relative z-10 border-y border-white/10 bg-gradient-to-b from-[#0b1222] to-[#050913] px-3 pb-2 pt-1.5 text-xs text-slate-200 shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+      <div className="mission-console relative z-10 shrink-0 border-y border-white/10 bg-gradient-to-b from-[#0b1222] to-[#050913] px-3 pb-2 pt-1.5 text-xs text-slate-200 shadow-[0_0_40px_rgba(0,0,0,0.9)]">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-400/70 to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent" />
+        <MobileMissionControls sim={sim} sound={sound} onSound={() => setSound(value => !value)} onOpen={onOpen} shipAlive={shipAlive} />
+        <div className="desktop-mission-controls">
         <div className="flex flex-wrap items-center justify-center gap-2">
           {/* Reproducción */}
           <div className="flex items-center gap-1.5">
             <button
               onClick={sim.togglePlay}
-              className="rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-1.5 font-semibold text-slate-950 shadow-[0_0_20px_-4px_rgba(251,146,60,0.9)] transition hover:brightness-110"
+              className="min-h-10 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-3 py-1.5 font-semibold text-slate-950 shadow-[0_0_20px_-4px_rgba(251,146,60,0.9)] transition hover:brightness-110 sm:min-h-0 sm:px-4"
             >
               {stage === "boarding" ? "🚀 Subir al cohete" : stage === "done" ? "↺ Repetir" : sim.playing ? "⏸ Pausa" : "▶ Seguir"}
             </button>
-            <button onClick={sim.reset} title="Reiniciar" aria-label="Reiniciar" className="rounded-full border border-white/15 px-3 py-1.5 text-slate-300 transition hover:border-white/40 hover:text-white">
+            <button onClick={sim.reset} title="Reiniciar" aria-label="Reiniciar" className="min-h-10 min-w-10 rounded-full border border-white/15 px-3 py-1.5 text-slate-300 transition hover:border-white/40 hover:text-white sm:min-h-0 sm:min-w-0">
               <span className="max-sm:hidden">Reiniciar</span>
               <span className="sm:hidden">↺</span>
             </button>
           </div>
           {/* Viaje: destino y ajustes, en una sola barra segmentada (en el celular va abajo, en su propia fila) */}
-          <div className={`${SEGMENTS} max-sm:order-2`}>
-            <label className={`${SEG} min-w-0`}>
+          <div className={`${SEGMENTS} max-sm:order-2 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-[calc(100%-6rem)]`}>
+            <label className={`${SEG} min-w-0 max-sm:w-full`}>
               <span className="hud-label text-slate-400">Destino</span>
               <select
                 value={destination.id}
                 onChange={(e) => sim.setDestination(DESTINATIONS.find((x) => x.id === e.target.value)!)}
-                className="max-w-[11rem] truncate bg-transparent font-medium text-white outline-none sm:max-w-[15rem] [&>option]:bg-slate-900"
+                className="min-w-0 max-w-[11rem] truncate bg-transparent font-medium text-white outline-none max-sm:flex-1 sm:max-w-[15rem] [&>option]:bg-slate-900"
               >
                 {destination.id === "custom" && <option value="custom">{formatLy(destination.distance)} (personalizado)</option>}
                 {DESTINATIONS.map((x) => (
@@ -474,7 +495,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               <input type="checkbox" checked={sim.roundTrip} onChange={(e) => sim.setRoundTrip(e.target.checked)} className="accent-cyan-400" />
               ↩ <span className="hidden 2xl:inline">ida y vuelta</span>
             </label>
-            <label className={`${SEG} ${SECONDARY}`} title="Cuánto tiempo pasa por cada segundo real">
+            <label className={`${SEG} ${SECONDARY}`} title="Ritmo manual: al ajustarlo se desactiva el director. Durante el embarque acelera la secuencia hasta 16×; en vuelo se aplica el ritmo elegido.">
               <span className="hud-label text-slate-400">Ritmo</span>
               <input
                 type="range"
@@ -494,13 +515,13 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               <input type="checkbox" checked={sim.hypersleep && shipAlive} disabled={!shipAlive} onChange={(e) => sim.setHypersleep(e.target.checked)} className="accent-sky-300" />
               ❄️ <span className="hidden 2xl:inline">hipersueño</span>
             </label>
-            <label className={`${SEG} cursor-pointer ${SECONDARY}`} title="Director: cámara lenta automática en el despegue, el volteo, las muertes y la llegada">
+            <label className={`${SEG} cursor-pointer ${SECONDARY}`} title="Director: limita el ritmo para mostrar el despegue y los momentos importantes. Al ajustar Ritmo manualmente se desactiva.">
               <input type="checkbox" checked={sim.director} onChange={(e) => sim.setDirector(e.target.checked)} className="accent-cyan-400" />
               🎬 <span className="hidden 2xl:inline">director</span>
             </label>
           </div>
           {/* Paneles y herramientas: solo íconos (con nombre en pantallas muy anchas) */}
-          <div className={SEGMENTS}>
+          <div className={`${SEGMENTS} max-sm:contents`}>
             <button onClick={() => onOpen("map")} title="Mapa" aria-label="Mapa" className={`${SEG} transition hover:bg-white/10`}>
               🗺 <span className="hidden 2xl:inline">Mapa</span>
             </button>
@@ -514,7 +535,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               onClick={() => setSound((v) => !v)}
               title={sound ? "Silenciar" : "Activar sonido: despegue, cabina, lluvia, guitarra, violín y cumpleaños"}
               aria-label={sound ? "Silenciar" : "Activar sonido"}
-              className={`${SEG} transition hover:bg-white/10`}
+              className={`${SEG} transition hover:bg-white/10 max-sm:order-3 max-sm:w-10 max-sm:rounded-full max-sm:border max-sm:border-white/10`}
             >
               {sound ? "🔊" : "🔇"}
             </button>
@@ -531,19 +552,29 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               }}
               title="Copiar un link a este viaje en este momento"
               aria-label="Compartir"
-              className={`${SEG} transition hover:bg-white/10`}
+              className={`${SEG} transition hover:bg-white/10 max-sm:order-3 max-sm:w-10 max-sm:rounded-full max-sm:border max-sm:border-white/10`}
             >
               {copied ? "✓" : "🔗"}
             </button>
           </div>
           {countdown > 0 && countdown <= 10 && <span className="glow-amber font-mono text-lg font-bold text-amber-300">T−{countdown}</span>}
         </div>
+        <div className="mt-1 hidden items-center gap-2 max-sm:flex [@media(max-height:520px)]:flex">
+          <label className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="hud-label shrink-0 text-slate-400">Ritmo</span>
+            <input type="range" min={-7.5} max={4} step={0.01} value={Math.log10(sim.rate)} onChange={event => sim.setRate(10 ** Number(event.target.value))} aria-label="Ritmo de simulación" className="h-8 min-w-0 flex-1 accent-cyan-400" />
+            <span className="w-24 shrink-0 text-right font-mono text-[10px] text-cyan-200">{formatPlayback(sim.rate)}/s</span>
+          </label>
+          <label className="flex min-h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg px-1 text-slate-300" title="Director: cámara lenta automática. Cambiar el ritmo lo desactiva.">
+            <input type="checkbox" checked={sim.director} onChange={event => sim.setDirector(event.target.checked)} aria-label="Director automático" className="h-4 w-4 accent-cyan-400" />🎬
+          </label>
+        </div>
         {/* Línea de tiempo de la misión por fases: se puede arrastrar para moverse por el viaje */}
         <div className="mx-auto mt-1 flex max-w-5xl items-end gap-2">
-          <span className="hud-label w-12 shrink-0 pb-1 text-right text-slate-500">T+0</span>
-          <div className="flex-1">
+          <span className="hud-label w-12 shrink-0 pb-1 text-right text-slate-500 max-sm:hidden">T+0</span>
+          <div className="min-w-0 flex-1">
             {/* Carril de momentos clave sobre la barra: un clic salta directo a cada uno */}
-            <div className="relative h-4">
+            <div className="relative h-4 max-sm:hidden">
               {marks.map((m) => (
                 <button
                   key={m.label}
@@ -558,7 +589,7 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
                 </button>
               ))}
             </div>
-            <div className="relative h-5">
+            <div className="relative h-5 max-sm:h-8">
               <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/5">
                 {trip.phases.map((p, i) =>
                   p.tau1 > p.tau0 ? (
@@ -583,12 +614,13 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               />
             </div>
           </div>
-          <span className="hud-label w-16 shrink-0 pb-1 text-slate-400">{Math.round(progress * 100)} %</span>
+          <span className="hud-label w-16 shrink-0 pb-1 text-slate-400 max-sm:w-9 max-sm:pb-2">{Math.round(progress * 100)} %</span>
+        </div>
         </div>
       </div>
 
       {/* ── Mitad inferior: la nave ── */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="scene-ship relative min-h-0 flex-1 overflow-hidden">
         <ShipScene
           stage={stage}
           cinematicTime={cinematicTime}
@@ -631,9 +663,9 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
             </span>
             {surfaceAct && shipAlive && <> · 🪐 {surfaceAct.label}</>}
             {destination.miller && ship.phase.kind === "stay" && stage === "flight" && shipAlive && (
-              <> · 🌊 En el planeta de Miller: cada hora suya son 7 años de {EARTH_NAME}</>
+              <> · 🌊 <span className={SECONDARY}>En el planeta de Miller: cada hora suya son 7 años de {EARTH_NAME}</span><span className="hidden max-sm:inline [@media(max-height:520px)]:inline">Miller · 1 h = 7 años en la Tierra</span></>
             )}
-            {cryo && shipAlive && <span className="text-sky-200"> · ❄️ En hipersueño: su cuerpo casi no envejece</span>}
+            {cryo && shipAlive && <span className="text-sky-200"> · ❄️ En hipersueño<span className={SECONDARY}>: su cuerpo casi no envejece</span></span>}
             {!cryo && !surfaceAct && !(destination.miller && ship.phase.kind === "stay") && shipAct && flying && !reunion && !shipTimelapse && shipYears * SEC_PER_YEAR > 3_600 && (
               <>
                 {" "}· {ship.phase.kind === "cruise" && shipAct.pose !== "sleep" ? `flotando — ${shipAct.label.toLowerCase()}` : shipAct.label}
@@ -644,16 +676,16 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
               <div className="text-xs text-amber-300">⚠️ Despierto no le alcanza la vida para terminar el viaje: vuelve a activar ❄️ hipersueño.</div>
             )}
             {greetFromEarth && (
-              <div className="text-xs text-cyan-200">
+              <div className={`text-xs text-cyan-200 ${SECONDARY}`}>
                 📨 Llegó el saludo que {EARTH_NAME} grabó al cumplir {START_AGE + greetFromEarth}: la luz tardó {formatYears(ship.t - greetFromEarth)}
                 {!earthAlive && " — en la Tierra, él ya murió"}
               </div>
             )}
             {live && shipAlive && !cryo && mail.perShipWeek >= 7 && (
-              <div className="text-xs text-sky-300">📬 Le llegan de golpe los mensajes de {EARTH_NAME}: {fmt(mail.perShipWeek / 7, 0)} por día. Ve pasar años de su vida en semanas.</div>
+              <div className={`text-xs text-sky-300 ${SECONDARY}`}>📬 Le llegan de golpe los mensajes de {EARTH_NAME}: {fmt(mail.perShipWeek / 7, 0)} por día. Ve pasar años de su vida en semanas.</div>
             )}
             {live && shipAlive && !cryo && mail.received > 0 && mail.perShipWeek > 0 && mail.perShipWeek < 0.3 && (
-              <div className="text-xs text-rose-300/80">📭 Los mensajes de {EARTH_NAME} llegan a cuentagotas: uno cada {fmt(1 / mail.perShipWeek, 0)} semanas.</div>
+              <div className={`text-xs text-rose-300/80 ${SECONDARY}`}>📭 Los mensajes de {EARTH_NAME} llegan a cuentagotas: uno cada {fmt(1 / mail.perShipWeek, 0)} semanas.</div>
             )}
             {sadNews && !cryo && <div className="text-xs text-rose-300">💔 Le llegó la noticia: {EARTH_NAME} murió.</div>}
             {shipAlive && shipTimelapse && <> · los días pasan volando</>}
@@ -718,10 +750,11 @@ export function TwinsTheater({ sim, d, onOpen }: { sim: Sim; d: Derived; onOpen:
         )}
       </div>
 
-      {stage === "done" && (
-        <div className="glass absolute inset-x-0 top-3/4 z-20 mx-auto w-[min(34rem,calc(100%-2rem))] -translate-y-1/2 p-5 text-center text-sm text-slate-200 max-sm:p-3 [@media(max-height:520px)]:top-auto [@media(max-height:520px)]:bottom-2 [@media(max-height:520px)]:translate-y-0 [@media(max-height:520px)]:p-2.5">
-          <div className="hud-label mb-1 text-cyan-300">Fin de la misión</div>
-          <div className="mb-2 text-xl font-semibold text-white max-sm:text-lg [@media(max-height:520px)]:mb-1 [@media(max-height:520px)]:text-base">
+      {stage === "done" && !summaryDismissed && (
+        <div role="dialog" aria-label="Resumen del fin de misión" className="glass absolute inset-x-0 max-h-[calc(100%-1rem)] overflow-y-auto top-3/4 z-20 mx-auto w-[min(34rem,calc(100%-2rem))] -translate-y-1/2 p-5 text-center text-sm text-slate-200 max-sm:p-3 [@media(max-height:520px)]:top-auto [@media(max-height:520px)]:bottom-2 [@media(max-height:520px)]:translate-y-0 [@media(max-height:520px)]:p-2.5">
+          <button type="button" onClick={() => setSummaryDismissed(true)} aria-label="Cerrar resumen de misión" title="Cerrar resumen" className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-xl text-slate-300 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-cyan-300">✕</button>
+          <div className="hud-label mb-1 px-9 text-cyan-300">Fin de la misión</div>
+          <div className="mb-2 px-8 text-xl font-semibold text-white max-sm:text-lg [@media(max-height:520px)]:mb-1 [@media(max-height:520px)]:text-base">
             {sim.roundTrip ? `Regreso a la Tierra · año ${fmtYear(LAUNCH_YEAR + Math.floor(d.earthProper))}` : `Llegada a ${destination.name}`}
           </div>
           <div className="grid grid-cols-2 gap-2 text-left">
